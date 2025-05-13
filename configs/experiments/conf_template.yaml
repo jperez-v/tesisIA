@@ -1,0 +1,107 @@
+# =====================================================================
+#  CONFIGURACIÓN BASE  ─  Clona y personaliza para cada experimento
+# =====================================================================
+#  ▸ Las líneas que empiezan con “##” son comentarios ‑ayuda/guía‑
+#  ▸ Cambia los valores marcados con ‹...›; el resto suele permanecer.
+#  ▸ Para usar herencia hereda de este archivo con:   _base_: conf_base.yaml
+# =====================================================================
+
+# ---------------------------------------------------------------------
+# 1) EXPERIMENTO
+# ---------------------------------------------------------------------
+experiment:
+  ## Nombre único y corto (carpetas, TensorBoard, etc.)
+  name:        "<exp_name>"                   # p.ej. "exp_model1_b"
+
+  ## Descripción legible (se muestra en logs)
+  description: "<breve descripción del experimento>"
+
+  ## Módulo (.ipynb) dentro de structure/models/
+  model_module: "<module_name>"               # p.ej. "model1"
+
+  ## Clase dentro del módulo (debe heredar de tu BaseTFModel)
+  model_class:  "NN"                # Siempre debe ser "NN"
+
+  ## Directorio raíz donde guardar salidas (se crea en runtime)
+  output_root:  "outputs"
+
+  ## Subcarpeta específica de este experimento
+  output_subdir: "<subdir_name>"              # p.ej. "model1_b"
+
+
+# ---------------------------------------------------------------------
+# 2) DATASET
+# ---------------------------------------------------------------------
+dataset:
+  ## "local"  → se usa datasets/<local_path>
+  ## "kaggle" → se descarga y se cachea en kaggle/download_dir
+  source: "kaggle"                            # "local" | "kaggle"
+
+  ## Ruta relativa dentro de structure/datasets (solo si source=="local")
+  local_path: "-"                             # ej. "raw/mi_dataset.hdf5"
+
+  kaggle:                                     # solo si source=="kaggle"
+    dataset_id:  "<kaggle_username>/<slug>"   # ej. "user/snr8-12-taps2-phase0"
+    download_dir: "datasets/kaggle"           # carpeta local donde guardar
+    file_pattern: "*.hdf5"                    # glob para elegir el archivo
+
+  ## Mapping de llaves dentro del HDF5 (normalmente no se cambia)
+  keys:
+    X: "X"
+    Y: "Y"
+    Z: "Z"
+
+  ## Nombres de clases (orden == índices)
+  class_names:
+    - "bpsk"
+    - "qpsk"
+    - "16qam"
+    - "32qam cross"
+    - "64qam"
+    - "128qam cross"
+    - "256qam"
+
+  ## División train / val  (ignorado si usas k_folds)
+  train_pct: 0.8
+
+  ## Validación cruzada: pon número (k) o null
+  k_folds:   null
+  fold_index: 0
+
+
+# ---------------------------------------------------------------------
+# 3) MODELO  (hiperparámetros del NN)
+# ---------------------------------------------------------------------
+model:
+  params:
+    seq_len:           4096          # nº muestras por señal
+    n_classes:         7             # ≡ len(class_names)
+    inception_filters: 64
+    res_filters:      [128, 256]
+    pool_size:         4
+    gru_units:        128
+    dense_units:      256
+    dropout:          0.5
+
+
+# ---------------------------------------------------------------------
+# 4) ENTRENAMIENTO
+# ---------------------------------------------------------------------
+training:
+  batch_size:    80
+  epochs:        20                  # <— ajusta aquí
+  learning_rate: 1e-3
+  patience:      5                   # early‑stopping
+  seed:          42
+
+
+# ---------------------------------------------------------------------
+# 5) RUTAS AUXILIARES
+# ---------------------------------------------------------------------
+paths:
+  logs_dir:        "logs"                 # TensorBoard y CSVLogger
+  checkpoints_dir: "models/checkpoints"   # pesos .keras
+
+# =====================================================================
+#    FIN DEL TEMPLATE   –  Duplica → edita → corre tu experimento
+# =====================================================================
