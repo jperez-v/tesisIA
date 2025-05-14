@@ -140,10 +140,7 @@ class HDF5Dataset:
             self.train_idx if split == "train" else self.val_idx
         )  # índices absolutos
     
-        # Decide si adjuntar el índice como tercer tensor
-        if include_index is None:
-            include_index = split == "val"   # por defecto, solo en validación
-    
+
         if include_index:
             ds = tf.data.Dataset.from_tensor_slices((X_split, Y_split, idx_split))
         else:

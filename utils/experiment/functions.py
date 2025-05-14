@@ -100,7 +100,9 @@ def load_experiment(exp_name: str):
     bs = cfg["training"].get("batch_size", 32)
     train_tf = full_ds.to_tf_dataset("train", batch_size=bs, shuffle=True)
     val_tf   = full_ds.to_tf_dataset("val",   batch_size=bs, shuffle=False)
-    train_data, val_data = train_tf, val_tf
+    val_tf_idx   = full_ds.to_tf_dataset("val",   batch_size=bs, shuffle=False, include_index=True)
+    
+    train_data, val_data, val_data_idx= train_tf, val_tf, val_tf_idx
 
     # ─────────────────── 6) Return ────────────────────────────────────────
-    return cfg, ModelClass, model_params, full_ds, train_data, val_data
+    return cfg, ModelClass, model_params, full_ds, train_data, val_data, val_data_idx
