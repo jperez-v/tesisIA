@@ -1,10 +1,8 @@
-# models/base_tf_model.py
-
 import os
 import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
 from pathlib import Path
-from tensorflow.keras.losses import SparseCategoricalCrossentropy
+from tensorflow.keras.losses import CategoricalCrossentropy
 
 class BaseTFModel:
     """
@@ -41,7 +39,7 @@ class BaseTFModel:
         )
         self.model.compile(
             optimizer=optimizer,
-            loss=SparseCategoricalCrossentropy(),  # para etiquetas enteras
+            loss=CategoricalCrossentropy(),
             metrics=['accuracy']
         )
 

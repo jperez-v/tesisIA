@@ -1,6 +1,8 @@
 # =====================================================================
 #  CONFIGURACIÓN BASE  ─  Clona y personaliza para cada experimento
 # =====================================================================
+_base_: default.yaml
+
 #  ▸ Las líneas que empiezan con “##” son comentarios ‑ayuda/guía‑
 #  ▸ Cambia los valores marcados con ‹...›; el resto suele permanecer.
 #  ▸ Para usar herencia hereda de este archivo con:   _base_: conf_base.yaml

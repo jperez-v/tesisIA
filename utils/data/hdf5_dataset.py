@@ -1,4 +1,3 @@
-# utils/data/hdf5_dataset.py
 """
 Carga un .hdf5 (local o descargado desde Kaggle) y genera:
   •  Atributos X, Y, Z en NumPy.
@@ -15,7 +14,7 @@ import h5py
 import numpy as np
 from sklearn.model_selection import KFold
 
-try:                     
+try:
     # solo necesario si usas source='kaggle'
     os.environ['KAGGLE_USERNAME'] = 'ilikepizzaanddrones'
     os.environ['KAGGLE_KEY']      = 'b7d0370fced8eb934d226172fff8221f'
@@ -83,11 +82,10 @@ class HDF5Dataset:
                 self.Effects = eff            # structured array
             else:
                 self.Effects = None           # << siempre creado
-
-        self.X = X.astype(np.float32)
-        self.Y = np.argmax(Y, axis=-1).astype(np.int64)      # one‑hot → índice
-        self.Z = Z.astype(np.float32)
         
+        self.X = X
+        self.Y = Y
+        self.Z = Z
         
         # ─────────────────── 2) Índices de split ───────────────────
         rng = np.random.RandomState(seed)
@@ -106,7 +104,7 @@ class HDF5Dataset:
 
     # ─────────────────── helpers ───────────────────
     def get_arrays(self, split: str | None = None):
-        """Devuelve (X_split, Y_split) en NumPy."""
+        """Devuelve (X_split, Y_split)"""
         split = (split or self.split).lower()
         idx   = self.train_idx if split == "train" else self.val_idx
         return self.X[idx], self.Y[idx]
