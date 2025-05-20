@@ -13,11 +13,6 @@ from sklearn.metrics import (
 )
 
 
-CONFIG_ROOT = Path("/content/drive/MyDrive/structure/configs")
-MODELS_ROOT = Path("/content/drive/MyDrive/structure/models")
-DATA_ROOT   = Path("/content/drive/MyDrive/structure/datasets")
-REPORTS_ROOT = Path("/content/drive/MyDrive/structure/reports")
-
 class ExperimentAnalyzer:
     # ------------------------------------------------------------------ #
     #  CONSTRUCTOR
@@ -45,7 +40,9 @@ class ExperimentAnalyzer:
         self.class_names = self.cfg["dataset"].get("class_names")
         self.effects = effects
         
-        self.output_dir = REPORTS_ROOT / f"{self.cfg.get('experiment').get('output_subdir')}"
+        self.BASE_DIR = Path('/content/drive/MyDrive/structure')
+        self.output_dir = self.BASE_DIR / self.cfg.get('experiment').get('output_root') / self.cfg.get('experiment').get('output_subdir') / 'reports'
+    
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         
