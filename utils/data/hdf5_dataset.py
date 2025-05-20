@@ -114,9 +114,9 @@ class HDF5Dataset:
             split: str | None = None,
             batch_size: int = 32,
             shuffle: bool = True,
+            include_index: bool = False,
             buffer_size: int | None = None,
             prefetch: bool = True,
-            include_index: bool | None = None,
         ):
         """
         Devuelve un tf.data.Dataset listo para Keras.
@@ -130,7 +130,6 @@ class HDF5Dataset:
         prefetch       : aplica .prefetch(AUTOTUNE) si True
         include_index  : • True  → añade el índice original como 3er tensor
                          • False → devuelve solo (X, y)
-                         • None  → incluye el índice SOLO si split == "val"
         """
         import tensorflow as tf
     

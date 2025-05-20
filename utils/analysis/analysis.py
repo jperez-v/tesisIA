@@ -5,12 +5,18 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import seaborn as sns
+from pathlib import Path
 from sklearn.metrics import (
     confusion_matrix,
     ConfusionMatrixDisplay,
     classification_report,
 )
 
+
+CONFIG_ROOT = Path("/content/drive/MyDrive/structure/configs")
+MODELS_ROOT = Path("/content/drive/MyDrive/structure/models")
+DATA_ROOT   = Path("/content/drive/MyDrive/structure/datasets")
+REPORTS_ROOT = Path("/content/drive/MyDrive/structure/reports")
 
 class ExperimentAnalyzer:
     # ------------------------------------------------------------------ #
@@ -21,7 +27,7 @@ class ExperimentAnalyzer:
         model: tf.keras.Model,
         history,
         val_data: tf.data.Dataset,
-        class_names: list[str] | None = None,
+        cfg: dict,
         effects: np.ndarray | None = None,
     ):
         """
@@ -30,14 +36,19 @@ class ExperimentAnalyzer:
         model        : tf.keras.Model ya entrenado.
         history      : Objeto retornado por `model.fit()` o bien un dict de historial.
         val_data     : tf.data.Dataset -> (X, y_onehot, idx) por batch.
-        class_names  : Lista opcional con nombres legibles de las clases.
+        cfg          : dict de configuración del experimento
         effects      : Structured array con efectos de validación.
         """
         self.model = model
         self.history = history.history if hasattr(history, "history") else history
-        self.class_names = class_names
+        self.cfg = cfg
+        self.class_names = self.cfg["dataset"].get("class_names")
         self.effects = effects
-
+        
+        self.output_dir = REPORTS_ROOT / f"{self.cfg.get('experiment').get('output_subdir')}"
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        
         # Mapper: (x, y_onehot) o (x, y_onehot, idx) -> (x, y_idx, idx_or_None)
         def to_labels_and_idx(*batch):
             x = batch[0]
@@ -117,6 +128,12 @@ class ExperimentAnalyzer:
         if normalize:
             title += f" (normalizada={normalize})"
         ax.set_title(title)
+        
+        # Guardar
+        file_path = self.output_dir / "confusion_matrix.png"
+        fig.savefig(file_path, dpi=300)
+        print(f"🔖 Gráfica guardada en: {file_path}")
+        
         plt.show()
 
     def classification_report(self) -> None:
@@ -144,37 +161,73 @@ class ExperimentAnalyzer:
         mask = y_pred != self.y_val
         return self.idx_val[mask].tolist()
 
-    def effect_diagnostics(self, field: str) -> None:
+    def effect_diagnostics(self, field: str, bins: int = 10) -> None:
         """
-        Visualiza cómo un efecto influye en los fallos de clasificación.
+        Visualiza cómo un efecto influye en los fallos de clasificación
+        usando barras apiladas normalizadas (éxito / error suman 1),
+        y opcionalmente guarda la gráfica en PNG.
+
+        Parámetros
+        ----------
+        field : str
+            Nombre del campo en self.effects para analizar.
+        bins : int, opcional
+            Número de bins a usar si el campo es continuo.
+        save_path : str | None, opcional
+            Ruta de archivo donde guardar la figura (PNG). Si es None, no guarda.
         """
         if self.effects is None:
             raise ValueError("No se proporcionó 'effects'.")
         if field not in self.effects.dtype.names:
             raise ValueError(f"'{field}' no existe en Effects.")
 
+        # Predicciones y mask de correctas
         y_pred = self._predict_classes(self.X_val)
         correct = y_pred == self.y_val
-        df = pd.DataFrame({
-            field: self.effects[field],
-            "correct": correct
-        })
 
-        # Categórico vs continuo
-        if df[field].dtype.kind in "iu" and df[field].nunique() <= 10:
-            plt.figure(figsize=(6, 4))
-            sns.countplot(x=field, hue="correct", data=df, palette="Set2")
-            plt.title(f"Errores vs {field}")
-            plt.ylabel("nº de señales"); plt.show()
-        else:
-            plt.figure(figsize=(6, 4))
-            sns.histplot(
-                data=df, x=field, hue="correct",
-                bins=20, element="step",
-                stat="density", common_norm=False
+        df = pd.DataFrame({ field: self.effects[field], "correct": correct })
+        is_cat = df[field].dtype.kind in "iu" and df[field].nunique() <= 10
+
+        # Preparamos figura
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+        if is_cat:
+            prop = (
+                df
+                .groupby(field)["correct"]
+                .value_counts(normalize=True)
+                .unstack(fill_value=0)
+                .rename(columns={True: "success", False: "error"})
             )
-            plt.title(f"Distribución de {field} (correct / fail)")
-            plt.show()
+            prop.plot(kind="bar", stacked=True, edgecolor="black", ax=ax)
+            ax.set_xlabel(field)
+            title = f"Éxito vs Error por {field} (normalizado)"
+        else:
+            df["bin"] = pd.cut(df[field], bins=bins)
+            prop = (
+                df
+                .groupby("bin", observed=True)["correct"]
+                .value_counts(normalize=True)
+                .unstack(fill_value=0)
+                .rename(columns={True: "success", False: "error"})
+            )
+            prop.plot(kind="bar", stacked=True, edgecolor="black", ax=ax)
+            ax.set_xlabel(f"{field} (binned)")
+            ax.set_xticklabels(prop.index.astype(str), rotation=45, ha="right")
+            title = f"Éxito vs Error en bins de {field} (normalizado)"
+
+        ax.set_ylabel("Proporción")
+        ax.set_title(title)
+        ax.legend(["Éxito", "Error"], loc="upper right")
+        ax.set_ylim(0, 1)
+        plt.tight_layout()
+
+        # Guardar
+        file_path = self.output_dir /  f"report_{field}.png"
+        fig.savefig(file_path, dpi=300, bbox_inches="tight")
+        print(f"🔖 Gráfica guardada en: {file_path}")
+
+        plt.show()
 
     # ------------------------------------------------------------------ #
     #  MÉTODOS PRIVADOS
