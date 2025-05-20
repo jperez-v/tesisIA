@@ -20,9 +20,9 @@ class ExperimentAnalyzer:
     def __init__(
         self,
         model: tf.keras.Model,
-        history,
         val_data: tf.data.Dataset,
         cfg: dict,
+        history = None,
         effects: np.ndarray | None = None,
     ):
         """
@@ -68,6 +68,8 @@ class ExperimentAnalyzer:
     # ------------------------------------------------------------------ #
     def plot_training_curves(self) -> None:
         """Gráfica de pérdida y exactitud (train / val), ejes iniciando en cero."""
+        if not self.history:
+            print("** No es posible graficar las curvas de entrenamiento. No se ha proporcionado el parámetro 'history' **")
         epochs = range(1, len(self.history["loss"]) + 1)
 
         plt.figure(figsize=(12, 4))
