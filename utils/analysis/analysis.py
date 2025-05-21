@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import json
 import numpy as np
 import pandas as pd
+from datetime import datetime
 import matplotlib.pyplot as plt
 import tensorflow as tf
-import seaborn as sns
+from tensorflow.keras.utils import to_categorical
 from pathlib import Path
 from sklearn.metrics import (
     confusion_matrix,
     ConfusionMatrixDisplay,
-    classification_report,
+    classification_report as sk_cr,
 )
+
 
 
 class ExperimentAnalyzer:
@@ -22,31 +25,35 @@ class ExperimentAnalyzer:
         model: tf.keras.Model,
         val_data: tf.data.Dataset,
         cfg: dict,
-        history = None,
+        history=None,
         effects: np.ndarray | None = None,
     ):
         """
         Parámetros
         ----------
-        model        : tf.keras.Model ya entrenado.
-        history      : Objeto retornado por `model.fit()` o bien un dict de historial.
-        val_data     : tf.data.Dataset -> (X, y_onehot, idx) por batch.
-        cfg          : dict de configuración del experimento
-        effects      : Structured array con efectos de validación.
+        model   : tf.keras.Model ya entrenado.
+        history : Objeto retornado por `model.fit()` o bien un dict de historial.
+        val_data_idx: tf.data.Dataset -> (X, y_onehot, idx) por batch.
+        cfg     : dict de configuración del experimento.
+        effects : Structured array con efectos de validación.
         """
         self.model = model
         self.history = history.history if hasattr(history, "history") else history
         self.cfg = cfg
         self.class_names = self.cfg["dataset"].get("class_names")
         self.effects = effects
-        
+
         self.BASE_DIR = Path('/content/drive/MyDrive/structure')
-        self.output_dir = self.BASE_DIR / self.cfg.get('experiment').get('output_root') / self.cfg.get('experiment').get('output_subdir') / 'reports'
-    
+        exp_cfg = self.cfg.get('experiment', {})
+        self.output_dir = (
+            self.BASE_DIR
+            / exp_cfg.get('output_root', '')
+            / exp_cfg.get('output_subdir', '')
+            / 'reports'
+        )
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
-        
-        # Mapper: (x, y_onehot) o (x, y_onehot, idx) -> (x, y_idx, idx_or_None)
+
+        # Mapper: convierte (x, y_onehot, [idx]) -> (x, y_idx, [idx])
         def to_labels_and_idx(*batch):
             x = batch[0]
             y_onehot = batch[1]
@@ -54,7 +61,7 @@ class ExperimentAnalyzer:
             y_idx = tf.argmax(y_onehot, axis=-1)
             return (x, y_idx, idx) if idx is not None else (x, y_idx)
 
-        # Aplicar siempre map al dataset de validación
+        # Mapea etiquetas a índices directamente
         val_data = val_data.map(
             to_labels_and_idx,
             num_parallel_calls=tf.data.AUTOTUNE
@@ -69,54 +76,50 @@ class ExperimentAnalyzer:
     def plot_training_curves(self) -> None:
         """Gráfica de pérdida y exactitud (train / val), ejes iniciando en cero."""
         if not self.history:
-            print("** No es posible graficar las curvas de entrenamiento. No se ha proporcionado el parámetro 'history' **")
-        epochs = range(1, len(self.history["loss"]) + 1)
+            print("** No es posible graficar curvas. Parámetro 'history' no proporcionado **")
+            return
 
-        plt.figure(figsize=(12, 4))
+        epochs = range(1, len(self.history.get("loss", [])) + 1)
+        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
         # — Loss —
-        plt.subplot(1, 2, 1)
-        plt.plot(epochs, self.history["loss"], label="Train Loss")
-        plt.plot(epochs, self.history["val_loss"], label="Val Loss")
-        plt.title("Loss por Época")
-        plt.xlabel("Época")
-        plt.ylabel("Loss")
-        plt.ylim(bottom=0)
-        plt.legend()
+        ax = axes[0]
+        ax.plot(epochs, self.history.get("loss", []), label="Train Loss")
+        ax.plot(epochs, self.history.get("val_loss", []), label="Val Loss")
+        ax.set_title("Loss por Época")
+        ax.set_xlabel("Época")
+        ax.set_ylabel("Loss")
+        ax.set_ylim(bottom=0)
+        ax.legend()
+        ax.grid(True)
 
         # — Accuracy —
-        plt.subplot(1, 2, 2)
-        plt.plot(epochs, self.history["accuracy"], label="Train Acc")
-        plt.plot(epochs, self.history["val_accuracy"], label="Val Acc")
-        plt.title("Accuracy por Época")
-        plt.xlabel("Época")
-        plt.ylabel("Accuracy")
-        plt.ylim(0, 1)
-        plt.legend()
+        ax = axes[1]
+        ax.plot(epochs, self.history.get("accuracy", []), label="Train Acc")
+        ax.plot(epochs, self.history.get("val_accuracy", []), label="Val Acc")
+        ax.set_title("Accuracy por Época")
+        ax.set_xlabel("Época")
+        ax.set_ylabel("Accuracy")
+        ax.set_ylim(0, 1)
+        ax.legend()
+        ax.grid(True)
 
         plt.tight_layout()
         plt.show()
-        
+
     def confusion_matrix(self, normalize: str | None = None) -> None:
-        """
-        Dibuja la matriz de confusión.
-
-        normalize : 'true', 'pred', 'all' o None.
-        """
+        """Dibuja y guarda la matriz de confusión opcionalmente normalizada."""
         y_pred = self._predict_classes(self.X_val)
-
-        # Definir labels
-        if self.class_names is not None:
-            labels = list(range(len(self.class_names)))
-        else:
-            labels = np.unique(np.concatenate([self.y_val, y_pred])).tolist()
-
+        labels = (
+            list(range(len(self.class_names)))
+            if self.class_names
+            else np.unique(np.concatenate([self.y_val, y_pred])).tolist()
+        )
         cm = confusion_matrix(
             self.y_val, y_pred,
             labels=labels,
             normalize=normalize
         )
-
         disp = ConfusionMatrixDisplay(
             cm,
             display_labels=self.class_names or labels
@@ -127,116 +130,209 @@ class ExperimentAnalyzer:
         if normalize:
             title += f" (normalizada={normalize})"
         ax.set_title(title)
-        
+
         # Guardar
         file_path = self.output_dir / "confusion_matrix.png"
-        fig.savefig(file_path, dpi=300)
-        print(f"🔖 Gráfica guardada en: {file_path}")
-        
+        fig.savefig(file_path, dpi=300, bbox_inches="tight")
+        print(f"🔖 Guardado: {file_path}")
         plt.show()
 
     def classification_report(self) -> None:
-        """Imprime precisión, recall y F1 por clase."""
+        """
+        Evalúa el modelo sobre el set de validación, guarda en JSON el loss, la accuracy
+        de la evaluación y el classification_report completo, e imprime un resumen en consola.
+        Se ajusta para convertir y_val de índices a one-hot antes de evaluar.
+        """
+        
+        # 1) Preparar y_val en one-hot para evaluación
+        num_classes = self.model.output_shape[-1]
+        y_true_oh = to_categorical(self.y_val, num_classes=num_classes)
+    
+        # 2) Evaluación en el set de validación
+        batch_size = int(self.cfg.get("training", {}).get("batch_size", 32))
+        results = self.model.evaluate(self.X_val, y_true_oh,
+                                      batch_size=batch_size,
+                                      verbose=0)
+        val_loss = float(results[0])
+        val_acc  = float(results[1]) if len(results) > 1 else None
+    
+        # 3) Generar el dict completo del classification_report
         y_pred = self._predict_classes(self.X_val)
-        report = classification_report(
+        report_dict = sk_cr(
+            self.y_val,           # etiquetas en índice
+            y_pred,
+            target_names=self.class_names,
+            output_dict=True,
+            zero_division=0
+        )
+    
+        # 4) Construir objeto JSON con metadata y resultados
+        out = {
+            "experiment": {
+                "name":      self.cfg["experiment"]["name"],
+                "timestamp": datetime.now().isoformat()
+            },
+            "evaluation": {
+                "loss":     val_loss,
+                "accuracy": val_acc
+            },
+            "classification_report": report_dict
+        }
+    
+        # 5) Guardar JSON
+        json_path = self.output_dir / "classification_report.json"
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(out, f, indent=2, ensure_ascii=False)
+        print(f"🔖 JSON de métricas y evaluación guardado en: {json_path}")
+    
+        # 6) Imprimir resumen en consola
+        text_report = sk_cr(
             self.y_val,
             y_pred,
             target_names=self.class_names,
             digits=4,
             zero_division=0
         )
-        print("\n📄 Classification Report\n")
-        print(report)
+        print("\n📄 Classification Report Summary\n")
+        print(text_report)
+        print(f"\nEval loss: {val_loss:.4f}"
+              f"{', Eval accuracy: '+format(val_acc, '.4f') if val_acc is not None else ''}")
+
 
     def misclassified_indices(self) -> list[int]:
-        """
-        Retorna los índices originales de las muestras mal clasificadas.
-        """
+        """Índices originales de muestras mal clasificadas."""
         if self.idx_val is None:
-            raise ValueError(
-                "El Dataset de validación no incluye índices."
-            )
+            raise ValueError("Dataset de validación sin 'idx'.")
         y_pred = self._predict_classes(self.X_val)
         mask = y_pred != self.y_val
         return self.idx_val[mask].tolist()
-
-    def effect_diagnostics(self, field: str, bins: int = 10) -> None:
+    
+    def effect_report(self,
+                      fields: list[str] = ['num_taps', 'snr_db', 'phase_offset', 'roll_off'],
+                      save_csv: bool = False,
+                      bins: int = 10) -> None:
         """
-        Visualiza cómo un efecto influye en los fallos de clasificación
-        usando barras apiladas normalizadas (éxito / error suman 1),
-        y opcionalmente guarda la gráfica en PNG.
-
-        Parámetros
-        ----------
-        field : str
-            Nombre del campo en self.effects para analizar.
-        bins : int, opcional
-            Número de bins a usar si el campo es continuo.
-        save_path : str | None, opcional
-            Ruta de archivo donde guardar la figura (PNG). Si es None, no guarda.
+        Genera un único informe JSON de effects para varios campos, 
+        y guarda además una gráfica PNG por campo.
+        
+        - fields: lista de campos a analizar en self.effects. 
+                  Si es None, usa ['num_taps', 'snr_db', 'phase_offset', 'roll_off'].
+        - bins: número de bins si el campo es continuo.
+        
+        No retorna nada; guarda:
+          • effects_report.json      ← JSON con todos los fields,
+          • report_<field>.png       ← gráfica de barras apiladas,
+          • effects_report_<field>.csv ← CSV con datos de proporciones.
         """
+    
         if self.effects is None:
             raise ValueError("No se proporcionó 'effects'.")
-        if field not in self.effects.dtype.names:
-            raise ValueError(f"'{field}' no existe en Effects.")
-
-        # Predicciones y mask de correctas
+    
+        if fields is None:
+            raise ValueError("La lista 'fields' está vacía.")
+    
+        # Predicción y máscara de correctas
         y_pred = self._predict_classes(self.X_val)
         correct = y_pred == self.y_val
-
-        df = pd.DataFrame({ field: self.effects[field], "correct": correct })
-        is_cat = df[field].dtype.kind in "iu" and df[field].nunique() <= 10
-
-        # Preparamos figura
-        fig, ax = plt.subplots(figsize=(8, 5))
-
-        if is_cat:
-            prop = (
-                df
-                .groupby(field)["correct"]
-                .value_counts(normalize=True)
-                .unstack(fill_value=0)
-                .rename(columns={True: "success", False: "error"})
+    
+        # Construir dict principal
+        report: dict = {
+            "experiment": {
+                "name": self.cfg["experiment"]["name"],
+                "timestamp": datetime.now().isoformat()
+            },
+            "effects": {}
+        }
+    
+        for field in fields:
+            if field not in self.effects.dtype.names:
+                raise ValueError(f"'{field}' no existe en effects.")
+    
+            # DataFrame con el efecto y acierto/fallo
+            df = pd.DataFrame({field: self.effects[field], "correct": correct})
+    
+            # Categórico vs continuo
+            is_cat = df[field].dtype.kind in "iu" and df[field].nunique() <= 10
+    
+            # Agrupar y calcular proporciones
+            if is_cat:
+                grp = (
+                    df.groupby(field)["correct"]
+                      .value_counts(normalize=True)
+                      .unstack(fill_value=0)
+                      .rename(columns={True: "Éxito", False: "Error"})
+                )
+                x_label = field
+            else:
+                df["bin"] = pd.cut(df[field], bins=bins)
+                grp = (
+                    df.groupby("bin", observed=True)["correct"]
+                      .value_counts(normalize=True)
+                      .unstack(fill_value=0)
+                      .rename(columns={True: "Éxito", False: "Error"})
+                )
+                x_label = f"{field} (binned)"
+    
+            # Asegurar orden: éxito abajo, error arriba
+            grp = grp[["Éxito", "Error"]]
+    
+            # --- 1) Guardar CSV de datos ---
+            if save_csv:
+                csv_path = self.output_dir / f"effects_report_{field}.csv"
+                grp.to_csv(csv_path, index_label=(field if is_cat else "bin"))
+                print(f"🔖 Datos CSV guardados en: {csv_path}")
+    
+            # --- 2) Generar y guardar gráfica ---
+            fig, ax = plt.subplots(figsize=(8, 5))
+            grp.plot(
+                kind="bar",
+                stacked=True,
+                edgecolor="black",
+                color=["green", "red"],
+                ax=ax
             )
-            prop.plot(kind="bar", stacked=True, edgecolor="black", ax=ax)
-            ax.set_xlabel(field)
-            title = f"Éxito vs Error por {field} (normalizado)"
-        else:
-            df["bin"] = pd.cut(df[field], bins=bins)
-            prop = (
-                df
-                .groupby("bin", observed=True)["correct"]
-                .value_counts(normalize=True)
-                .unstack(fill_value=0)
-                .rename(columns={True: "success", False: "error"})
-            )
-            prop.plot(kind="bar", stacked=True, edgecolor="black", ax=ax)
-            ax.set_xlabel(f"{field} (binned)")
-            ax.set_xticklabels(prop.index.astype(str), rotation=45, ha="right")
-            title = f"Éxito vs Error en bins de {field} (normalizado)"
+            ax.set_xticks(np.arange(len(grp.index)))
+            ax.set_xticklabels([str(i) for i in grp.index], rotation=45, ha="right")
+            ax.set_xlabel(x_label)
+            ax.set_ylabel("Proporción")
+            ax.set_ylim(0, 1)
+            ax.set_title(f"Error vs Éxito por {field} (normalizado)")
+            ax.legend(loc="upper right")
+            plt.tight_layout()
+            
+            plt.show()
+    
+            png_path = self.output_dir / f"report_{field}.png"
+            fig.savefig(png_path, dpi=300, bbox_inches="tight")
+            plt.close(fig)
+            print(f"🔖 Gráfico guardado en: {png_path}")
+    
+            # --- 3) Añadir al JSON ---
+            report["effects"][field] = {
+                "is_categorical": bool(is_cat),
+                "bins": None if is_cat else bins,
+                "values": {
+                    str(idx): {
+                        "Éxito": float(row["Éxito"]),
+                        "Error": float(row["Error"])
+                    }
+                    for idx, row in grp.iterrows()
+                }
+            }
+    
+        # --- 4) Guardar JSON único ---
+        json_path = self.output_dir / "effects_report.json"
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(report, f, indent=2, ensure_ascii=False)
+        print(f"🔖 Effects report JSON guardado en: {json_path}")
 
-        ax.set_ylabel("Proporción")
-        ax.set_title(title)
-        ax.legend(["Éxito", "Error"], loc="upper right")
-        ax.set_ylim(0, 1)
-        plt.tight_layout()
-
-        # Guardar
-        file_path = self.output_dir /  f"report_{field}.png"
-        fig.savefig(file_path, dpi=300, bbox_inches="tight")
-        print(f"🔖 Gráfica guardada en: {file_path}")
-
-        plt.show()
 
     # ------------------------------------------------------------------ #
     #  MÉTODOS PRIVADOS
     # ------------------------------------------------------------------ #
     @staticmethod
     def _dataset_to_numpy(val_data):
-        """
-        Convierte tf.data.Dataset a arrays NumPy.
-        Devuelve (X, y, idx_or_None).
-        """
+        """Convierte tf.data.Dataset a NumPy arrays: X, y, [idx]."""
         xs, ys, idxs = [], [], []
         for batch in val_data:
             if len(batch) == 3:
@@ -244,13 +340,14 @@ class ExperimentAnalyzer:
                 idxs.append(idx.numpy())
             else:
                 x, y = batch
-            xs.append(x.numpy()); ys.append(y.numpy())
+            xs.append(x.numpy())
+            ys.append(y.numpy())
         X = np.concatenate(xs)
         Y = np.concatenate(ys)
         IDX = np.concatenate(idxs) if idxs else None
         return X, Y, IDX
 
     def _predict_classes(self, X, batch_size: int = 512) -> np.ndarray:
-        """Predice clases y devuelve argmax sobre probas softmax."""
+        """Predice clases y devuelve argmax sobre probabilidades softmax."""
         probs = self.model.predict(X, batch_size=batch_size, verbose=0)
         return np.argmax(probs, axis=-1)
