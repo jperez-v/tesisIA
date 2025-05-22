@@ -92,7 +92,7 @@ def load_experiment(exp_name: str, fold_index: int | None = None):
     
     # // Modificar subdirectorio si k-fold está configurado \\
     k = cfg["dataset"].get("k_folds")
-    if k is not None or k > 1:
+    if k is not None and k > 1:
         cfg["experiment"]["output_subdir"] = cfg["experiment"]["output_subdir"] + "/" + f"foldindex_{fold_index}"
 
     if ds_cfg["source"] == "kaggle":
