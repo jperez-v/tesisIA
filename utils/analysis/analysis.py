@@ -49,10 +49,10 @@ class ExperimentAnalyzer:
         
         # Inclusión fold_index si kfold está activado
         k = cfg["dataset"].get("k_folds")
-        if k is not None or k > 1:
+        if k is not None and k > 1:
             if fold_index is None:
                 raise ValueError("Es necesario indicar el índice de kfold para generar correctamente los reportes.")
-            self.fold_index = fold_index
+            self.fold_index = int(fold_index)
         else:
             self.fold_index = None
         

@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 import matplotlib.pyplot as plt
+from scipy.stats import t
+
 
 class ExperimentKFoldAnalyzer:
     """
@@ -16,7 +18,6 @@ class ExperimentKFoldAnalyzer:
         self.BASE_DIR = Path('/content/drive/MyDrive/structure')
         self.cfg = cfg
         exp_cfg = self.cfg.get('experiment', {})
-        exp_name = exp_cfg.get('name')
 
         # Directorio donde están las carpetas de folds
         self.root_exp_dir = (
@@ -30,7 +31,7 @@ class ExperimentKFoldAnalyzer:
             [fold_dir / 'reports' / 'classification_report.json'
              for fold_dir in self.root_exp_dir.iterdir()
              if fold_dir.is_dir()
-             and fold_dir.name.startswith(f"foldindex_")
+             and fold_dir.name.startswith("foldindex_")
              and (fold_dir / 'reports' / 'classification_report.json').exists()]
         )
         self.k = len(self.report_paths)
@@ -49,7 +50,7 @@ class ExperimentKFoldAnalyzer:
         for r in self.reports:
             fold = r['experiment'].get('fold_index')
             loss = r['evaluation']['loss']
-            acc = r['evaluation'].get('accuracy')
+            acc  = r['evaluation'].get('accuracy')
             data.append({'fold': fold, 'loss': loss, 'accuracy': acc})
         df = pd.DataFrame(data).set_index('fold').sort_index()
         stats = df.agg(['mean', 'std'])
@@ -68,45 +69,77 @@ class ExperimentKFoldAnalyzer:
         return avg
 
     def plot_evaluation(self) -> None:
-        """Grafica loss y accuracy por fold con barras de error."""
-        # Obtener el resumen completo y los datos solo de los folds
+        """Grafica loss y accuracy por fold con barras de error (desviación estándar)."""
         summary = self.aggregate_evaluation()
         fold_df = summary.head(self.k)
-    
+
         losses = fold_df['loss']
         accs   = fold_df['accuracy']
-    
-        # Desviaciones estándar
-        std_loss = losses.std()
-        std_acc  = accs.std()
-    
-        # Calcular márgenes (10% sobre el valor máximo)
+
+        std_loss = losses.std(ddof=1)
+        std_acc  = accs.std(ddof=1)
+
         loss_max   = losses.max()
         acc_max    = accs.max()
         loss_margin = loss_max * 0.10
-        acc_margin  = (1 - acc_max) * 0.10 if acc_max <= 1 else acc_max * 0.10
-    
+        acc_margin  = acc_max  * 0.10
+
         fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    
-        # Gráfica de Loss
+
         axes[0].errorbar(range(self.k), losses,
                          yerr=std_loss, fmt='o-', capsize=5)
         axes[0].set_title('Loss por Fold')
         axes[0].set_xlabel('Fold')
         axes[0].set_ylabel('Loss')
         axes[0].set_ylim(0, loss_max + loss_margin)
-    
-        # Gráfica de Accuracy
+
         axes[1].errorbar(range(self.k), accs,
                          yerr=std_acc, fmt='o-', capsize=5)
         axes[1].set_title('Accuracy por Fold')
         axes[1].set_xlabel('Fold')
         axes[1].set_ylabel('Accuracy')
         axes[1].set_ylim(0, acc_max + acc_margin)
-    
+
         plt.tight_layout()
         plt.show()
 
+    def plot_accuracy_summary(self, confidence: float = 0.95) -> None:
+        """Grafica una sola barra con la media de accuracy y su intervalo de confianza."""
+        # Extraer las k accuracies
+        summary   = self.aggregate_evaluation()
+        accuracies = summary.head(self.k)['accuracy']
+        k          = self.k
+
+        # Estadísticos
+        mean_acc = accuracies.mean()
+        std_acc  = accuracies.std(ddof=1)
+        se_acc   = std_acc / np.sqrt(k)
+
+        # Valor crítico t para el intervalo
+        alpha  = 1 - confidence
+        df     = k - 1
+        tcrit  = t.ppf(1 - alpha/2, df)
+        ci     = tcrit * se_acc
+
+        # Plot
+        fig, ax = plt.subplots(figsize=(4, 6))
+        ax.bar(
+            0, mean_acc,
+            yerr=ci,
+            capsize=10,
+            width=0.6,
+            label=f"{k}-fold CV"
+        )
+        ax.set_xticks([0])
+        ax.set_xticklabels(["Accuracy"])
+        ax.set_ylabel("Accuracy")
+        ax.set_title(f"Media de Accuracy con {int(confidence*100)}% IC")
+        ax.legend()
+
+        # Un poco de espacio extra arriba
+        ax.set_ylim(0, mean_acc + ci + 0.05)
+        plt.tight_layout()
+        plt.show()
 
     def report_summary(self) -> None:
         """Imprime en consola el resumen de evaluación y clasificación agregados."""
