@@ -19,8 +19,6 @@ dataset:
   train_pct: 0.8
   # Número de folds por defecto (None = usar split por porcentaje)
   k_folds: null
-  # Índice de fold por defecto en cross-validation
-  fold_index: 0
   # Claves por defecto dentro del archivo HDF5
   keys:
     X: "X"

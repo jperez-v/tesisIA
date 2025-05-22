@@ -35,7 +35,7 @@ class HDF5Dataset:
         split: str = "train",          # "train" | "val"
         train_pct: float = 0.8,
         k_folds: int | None = None,
-        fold_index: int = 0,
+        fold_index: int | None = None,
         seed: int = 42,
         # --- keys dentro del HDF5
         keys: dict | None = None,
@@ -91,15 +91,19 @@ class HDF5Dataset:
         rng = np.random.RandomState(seed)
         indices = np.arange(len(self.X))
 
-        if k_folds and k_folds > 1:
+        # Validar fold_index si se usa k_folds
+        if k_folds is not None and k_folds > 1:
+            if not (0 <= fold_index < k_folds):
+                raise ValueError(f"fold_index={fold_index} fuera de rango para k_folds={k_folds}")
             kf = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
-            train_idx, val_idx = list(kf.split(indices))[fold_index]
-            self.train_idx, self.val_idx = train_idx, val_idx
+            splits = list(kf.split(indices))
+            train_idx, val_idx = splits[fold_index]
         else:
             rng.shuffle(indices)
             cut = int(len(indices) * train_pct)
-            self.train_idx, self.val_idx = indices[:cut], indices[cut:]
+            train_idx, val_idx = indices[:cut], indices[cut:]
 
+        self.train_idx, self.val_idx = train_idx, val_idx
         self.split = split.lower()
 
     # ─────────────────── helpers ───────────────────

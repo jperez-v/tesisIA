@@ -68,7 +68,6 @@ dataset:
 
   ## Validación cruzada: pon número (k) o null
   k_folds:   null
-  fold_index: 0
 
 
 # ---------------------------------------------------------------------

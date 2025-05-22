@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -27,6 +28,8 @@ class ExperimentAnalyzer:
         cfg: dict,
         history=None,
         effects: np.ndarray | None = None,
+        show_plots: bool = False,
+        fold_index: int | None = None,
     ):
         """
         Parámetros
@@ -42,7 +45,18 @@ class ExperimentAnalyzer:
         self.cfg = cfg
         self.class_names = self.cfg["dataset"].get("class_names")
         self.effects = effects
-
+        self.show_plots = show_plots
+        
+        # Inclusión fold_index si kfold está activado
+        k = cfg["dataset"].get("k_folds")
+        if k is not None or k > 1:
+            if fold_index is None:
+                raise ValueError("Es necesario indicar el índice de kfold para generar correctamente los reportes.")
+            self.fold_index = fold_index
+        else:
+            self.fold_index = None
+        
+        
         self.BASE_DIR = Path('/content/drive/MyDrive/structure')
         exp_cfg = self.cfg.get('experiment', {})
         self.output_dir = (
@@ -107,7 +121,7 @@ class ExperimentAnalyzer:
         plt.tight_layout()
         plt.show()
 
-    def confusion_matrix(self, normalize: str | None = None) -> None:
+    def confusion_matrix(self, normalize: str | None = None, show_plots: bool = True) -> None:
         """Dibuja y guarda la matriz de confusión opcionalmente normalizada."""
         y_pred = self._predict_classes(self.X_val)
         labels = (
@@ -131,11 +145,16 @@ class ExperimentAnalyzer:
             title += f" (normalizada={normalize})"
         ax.set_title(title)
 
+        if self.show_plots == True:
+            plt.show()
+            
         # Guardar
         file_path = self.output_dir / "confusion_matrix.png"
         fig.savefig(file_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
         print(f"🔖 Guardado: {file_path}")
-        plt.show()
+        
+        
 
     def classification_report(self) -> None:
         """
@@ -178,11 +197,16 @@ class ExperimentAnalyzer:
             },
             "classification_report": report_dict
         }
+        
+        # 4.1) Incluir fold_index (si es kfold)
+        if self.fold_index:
+            out["experiment"]["fold_index"] = int(self.fold_index)
     
         # 5) Guardar JSON
         json_path = self.output_dir / "classification_report.json"
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(out, f, indent=2, ensure_ascii=False)
+
         print(f"🔖 JSON de métricas y evaluación guardado en: {json_path}")
     
         # 6) Imprimir resumen en consola
@@ -243,7 +267,11 @@ class ExperimentAnalyzer:
             },
             "effects": {}
         }
-    
+        # Incluir fold_index (si es kfold)
+        if self.fold_index:
+            report["experiment"]["fold_index"] = int(self.fold_index)
+             
+
         for field in fields:
             if field not in self.effects.dtype.names:
                 raise ValueError(f"'{field}' no existe en effects.")
@@ -300,7 +328,8 @@ class ExperimentAnalyzer:
             ax.legend(loc="upper right")
             plt.tight_layout()
             
-            plt.show()
+            if self.show_plots == True:
+                plt.show()
     
             png_path = self.output_dir / f"report_{field}.png"
             fig.savefig(png_path, dpi=300, bbox_inches="tight")
@@ -324,6 +353,7 @@ class ExperimentAnalyzer:
         json_path = self.output_dir / "effects_report.json"
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2, ensure_ascii=False)
+
         print(f"🔖 Effects report JSON guardado en: {json_path}")
 
 

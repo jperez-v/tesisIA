@@ -31,18 +31,7 @@ CONFIG_ROOT = Path("/content/drive/MyDrive/structure/configs")
 MODELS_ROOT = Path("/content/drive/MyDrive/structure/models")
 DATA_ROOT   = Path("/content/drive/MyDrive/structure/datasets")
 
-
-def load_experiment(exp_name: str):
-    """
-    Devuelve:
-        cfg          → dict  (configuración combinada)
-        ModelClass   → type  (sub‑clase de tu BaseTFModel)
-        model_params → dict  (params filtrados para __init__)
-        train_data   → (X,Y) NumPy  ó  tf.data.Dataset  según flag
-        val_data     → idem
-    """
-
-    # ─────────────────── 1) Leer y combinar YAML ──────────────────────────
+def load_config(exp_name:str):
     exp_path = CONFIG_ROOT / "experiments" / f"{exp_name}.yaml"
     exp_cfg  = yaml.safe_load(exp_path.read_text())
 
@@ -51,6 +40,22 @@ def load_experiment(exp_name: str):
         cfg = {**base_cfg, **exp_cfg}                      # exp > default
     else:
         cfg = exp_cfg
+    return cfg
+
+def load_experiment(exp_name: str, fold_index: int | None = None):
+    """
+    Devuelve:
+        cfg          → dict  (configuración combinada)
+        ModelClass   → type  (sub‑clase de tu BaseTFModel)
+        model_params → dict  (params filtrados para __init__)
+        full_dataset 
+        train_data   → (X,Y) tf.data.Dataset
+        val_data     → idem
+        val_indices
+    """
+
+    # ─────────────────── 1) Leer YAML ──────────────────────────
+    cfg = load_config(exp_name=exp_name)
 
     # ─────────────────── 2) Notebook (.ipynb) → Python (.py) ──────────────
     model_module = cfg["experiment"]["model_module"]
@@ -80,10 +85,15 @@ def load_experiment(exp_name: str):
     common_ds_kwargs = dict(
         train_pct  = ds_cfg["train_pct"],
         k_folds    = ds_cfg["k_folds"] or None,
-        fold_index = ds_cfg["fold_index"],
+        fold_index = fold_index if ds_cfg["k_folds"] else None ,
         seed       = cfg["training"]["seed"],
         keys       = ds_cfg["keys"],
     )
+    
+    # // Modificar subdirectorio si k-fold está configurado \\
+    k = cfg["dataset"].get("k_folds")
+    if k is not None or k > 1:
+        cfg["experiment"]["output_subdir"] = cfg["experiment"]["output_subdir"] + "/" + f"foldindex_{fold_index}"
 
     if ds_cfg["source"] == "kaggle":
         full_ds = HDF5Dataset(
