@@ -104,23 +104,28 @@ class ExperimentKFoldAnalyzer:
         plt.show()
 
     def plot_accuracy_summary(self, confidence: float = 0.95) -> None:
-        """Grafica una sola barra con la media de accuracy y su intervalo de confianza."""
+        """Grafica una sola barra con la media de accuracy y su intervalo de confianza,
+        e imprime media, límite inferior y superior."""
         # Extraer las k accuracies
-        summary   = self.aggregate_evaluation()
+        summary    = self.aggregate_evaluation()
         accuracies = summary.head(self.k)['accuracy']
         k          = self.k
-
+    
         # Estadísticos
         mean_acc = accuracies.mean()
         std_acc  = accuracies.std(ddof=1)
         se_acc   = std_acc / np.sqrt(k)
-
+    
         # Valor crítico t para el intervalo
         alpha  = 1 - confidence
         df     = k - 1
         tcrit  = t.ppf(1 - alpha/2, df)
         ci     = tcrit * se_acc
-
+    
+        # Cálculo de límites
+        lb = mean_acc - ci
+        ub = mean_acc + ci
+    
         # Plot
         fig, ax = plt.subplots(figsize=(4, 6))
         ax.bar(
@@ -135,9 +140,30 @@ class ExperimentKFoldAnalyzer:
         ax.set_ylabel("Accuracy")
         ax.set_title(f"Media de Accuracy con {int(confidence*100)}% IC")
         ax.legend()
-
+    
         # Un poco de espacio extra arriba
-        ax.set_ylim(0, mean_acc + ci + 0.05)
+        ax.set_ylim(0, ub + 0.05)
+    
+        # Anotar valores
+        # Media
+        ax.text(
+            0, mean_acc + 0.01,
+            f"Media: {mean_acc:.3f}",
+            ha='center', va='bottom', fontweight='bold'
+        )
+        # Límite inferior
+        ax.text(
+            0, lb - 0.01,
+            f"LI: {lb:.3f}",
+            ha='center', va='top', color='gray'
+        )
+        # Límite superior
+        ax.text(
+            0, ub + 0.01,
+            f"LS: {ub:.3f}",
+            ha='center', va='bottom', color='gray'
+        )
+    
         plt.tight_layout()
         plt.show()
 
