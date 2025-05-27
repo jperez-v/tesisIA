@@ -68,7 +68,17 @@ class BaseTFModel:
                 save_best_only=bool(tr.get('save_best_only', True)),
                 save_weights_only=False,
                 verbose=1
-            )
+            ),
+            
+            # 4) Reduce learning rate on plateau
+            ReduceLROnPlateau(
+                monitor='val_accuracy',
+                factor=0.5,
+                patience=3,
+                min_lr=5e-5,
+                verbose=1
+            ),
+            
         ]
         return cbks
 
