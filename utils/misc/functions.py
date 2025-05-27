@@ -45,9 +45,9 @@ def print_exp_configuration(cfg: dict):
         ["Fuente",       src_label],
         ["Ruta / ID",    ruta],
         ["Dir descarga", extra],
+        ["test_pct",      ds.get("test_pct", "-")],
         ["train_pct",    ds.get("train_pct", "-")],
-        ["k_folds",      ds.get("k_folds", "-")],
-        ["fold_index",   ds.get("fold_index", "-")],
+        ["k_fold",   ds.get("k_fold", "-")],
         ["class_names",  ds.get("class_names", "-")],
     ]
     print("\n=== DATASET ===")

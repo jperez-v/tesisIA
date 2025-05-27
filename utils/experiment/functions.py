@@ -26,7 +26,7 @@ from utils.data.hdf5_dataset import HDF5Dataset
 
 
 
-# Rutas base (ajusta a tu estructura en Google Drive si cambia)
+# Rutas base (ajusta a tu estructura en Google Drive si cambia)
 CONFIG_ROOT = Path("/content/drive/MyDrive/structure/configs")
 MODELS_ROOT = Path("/content/drive/MyDrive/structure/models")
 DATA_ROOT   = Path("/content/drive/MyDrive/structure/datasets")
@@ -90,7 +90,7 @@ def load_experiment(exp_name: str, fold_index: int | None = None):
         seed       = cfg["training"]["seed"],
         keys       = ds_cfg["keys"],
     )
-    
+
     # // Modificar subdirectorio si k-fold está configurado \\
     k = cfg["dataset"].get("k_folds")
     if k is not None and k > 1:
@@ -111,9 +111,14 @@ def load_experiment(exp_name: str, fold_index: int | None = None):
     bs = cfg["training"].get("batch_size", 32)
     train_tf = full_ds.to_tf_dataset("train", batch_size=bs, shuffle=True)
     val_tf   = full_ds.to_tf_dataset("val",   batch_size=bs, shuffle=False)
-    val_tf_idx   = full_ds.to_tf_dataset("val",   batch_size=bs, shuffle=False, include_index=True)
-    
-    train_data, val_data, val_data_idx= train_tf, val_tf, val_tf_idx
+
+    test_tf_idx = (
+        None if full_ds.test_idx is None
+        else full_ds.to_tf_dataset("test", batch_size=bs,
+        shuffle=False, include_index=True)
+        )
+
+    train_data, val_data, test_data_idx = train_tf, val_tf, test_tf_idx
 
     # ─────────────────── 6) Return ────────────────────────────────────────
-    return cfg, ModelClass, model_params, full_ds, train_data, val_data, val_data_idx
+    return cfg, ModelClass, model_params, full_ds, train_data, val_data, test_data_idx

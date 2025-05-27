@@ -37,7 +37,7 @@ class HDF5Dataset:
         kaggle_dataset_id: str | None = None,
         local_download_dir: str | Path = "datasets/raw",
         # --- split
-        split: str = "train",  # "train" | "val" | "test"
+        split: str = "train",  # "train" | "val" | "test"
         test_pct: float = 0.15,  # proporción para test (0 → sin test)
         train_pct: float = 0.8,  # proporción *dentro* de train+val
         k_folds: int | None = None,
@@ -85,7 +85,7 @@ class HDF5Dataset:
             if "Effects" in f:
                 grp = f["Effects"]
                 dtype = [(name, grp[name].dtype) for name in grp.keys()]
-                eff = np.empty(len(X), dtype=dtype)
+                eff = np.empty(len(self.X), dtype=dtype)
                 for name in grp.keys():
                     eff[name] = grp[name][:]
                 self.Effects = eff            # structured array
@@ -98,18 +98,17 @@ class HDF5Dataset:
         indices = np.arange(len(self.X))
 
         # 2.1) Split TEST (fijo, estratificado) ─────────────────────────
-        if test_pct > 0:
-            trainval_idx, test_idx = train_test_split(
-                indices,
-                test_size=test_pct,
-                stratify=self.Y,
-                random_state=self.seed,
-            )
-            self.test_idx = np.array(test_idx, dtype=np.int64)
-        else:
-            trainval_idx = indices
-            self.test_idx = None
+        if test_pct <= 0:
+            raise ValueError(f"El porcentaje de testeo no puede ser menor o igual a cero. (test_pct={test_pct})")
 
+        trainval_idx, test_idx = train_test_split(
+            indices,
+            test_size=test_pct,
+            stratify=self.Y,
+            random_state=self.seed,
+        )
+        self.test_idx = np.array(test_idx, dtype=np.int64)
+            
         # 2.2) Dentro de trainval → CV o split porcentual ───────────────
         if k_folds is not None and k_folds > 1:
             if fold_index is None:
@@ -117,8 +116,14 @@ class HDF5Dataset:
             if not (0 <= fold_index < k_folds):
                 raise ValueError(f"fold_index={fold_index} fuera de rango para k_folds={k_folds}")
 
+            # ── Estratificación: aseguramos etiquetas en formato entero ──
+            if self.Y.ndim > 1:                       # one‑hot → entero
+                y_strat = np.argmax(self.Y, axis=-1)
+            else:                                     # ya es vector 1‑D
+                y_strat = self.Y
+
             skf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=seed)
-            splits = list(skf.split(trainval_idx, self.Y[trainval_idx]))
+            splits = list(skf.split(trainval_idx, y_strat[trainval_idx]))
             train_rel, val_rel = splits[fold_index]
             self.train_idx = trainval_idx[train_rel]
             self.val_idx   = trainval_idx[val_rel]
@@ -149,7 +154,6 @@ class HDF5Dataset:
     # ------------------------------------------------------------------
     def to_tf_dataset(
         self,
-        *,
         split: str | None = None,
         batch_size: int = 32,
         shuffle: bool = True,

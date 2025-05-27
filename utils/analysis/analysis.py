@@ -24,7 +24,7 @@ class ExperimentAnalyzer:
     def __init__(
         self,
         model: tf.keras.Model,
-        val_data: tf.data.Dataset,
+        test_data: tf.data.Dataset,
         cfg: dict,
         history=None,
         effects: np.ndarray | None = None,
@@ -36,7 +36,7 @@ class ExperimentAnalyzer:
         ----------
         model   : tf.keras.Model ya entrenado.
         history : Objeto retornado por `model.fit()` o bien un dict de historial.
-        val_data_idx: tf.data.Dataset -> (X, y_onehot, idx) por batch.
+        test_data: tf.data.Dataset -> (X, y_onehot, idx) por batch.
         cfg     : dict de configuración del experimento.
         effects : Structured array con efectos de validación.
         """
@@ -76,13 +76,13 @@ class ExperimentAnalyzer:
             return (x, y_idx, idx) if idx is not None else (x, y_idx)
 
         # Mapea etiquetas a índices directamente
-        val_data = val_data.map(
+        test_data = test_data.map(
             to_labels_and_idx,
             num_parallel_calls=tf.data.AUTOTUNE
         )
 
         # Convertir a NumPy arrays
-        self.X_val, self.y_val, self.idx_val = self._dataset_to_numpy(val_data)
+        self.X_val, self.y_val, self.idx_val = self._dataset_to_numpy(test_data)
 
     # ------------------------------------------------------------------ #
     #  MÉTODOS PÚBLICOS
@@ -377,7 +377,7 @@ class ExperimentAnalyzer:
         IDX = np.concatenate(idxs) if idxs else None
         return X, Y, IDX
 
-    def _predict_classes(self, X, batch_size: int = 512) -> np.ndarray:
+    def _predict_classes(self, X, batch_size: int = 128) -> np.ndarray:
         """Predice clases y devuelve argmax sobre probabilidades softmax."""
         probs = self.model.predict(X, batch_size=batch_size, verbose=0)
         return np.argmax(probs, axis=-1)
