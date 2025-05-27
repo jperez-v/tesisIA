@@ -1,6 +1,6 @@
 import os
 import tensorflow as tf
-from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
+from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping, ReduceLROnPlateau
 from pathlib import Path
 from tensorflow.keras.losses import CategoricalCrossentropy
 
