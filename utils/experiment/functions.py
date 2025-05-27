@@ -83,6 +83,7 @@ def load_experiment(exp_name: str, fold_index: int | None = None):
     # ─────────────────── 5) Preparar Dataset (local o Kaggle) ─────────────
     ds_cfg = cfg["dataset"]
     common_ds_kwargs = dict(
+        test_pct   = ds_cfg["test_pct"],
         train_pct  = ds_cfg["train_pct"],
         k_folds    = ds_cfg["k_folds"] or None,
         fold_index = fold_index if ds_cfg["k_folds"] else None ,

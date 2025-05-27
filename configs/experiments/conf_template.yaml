@@ -63,7 +63,11 @@ dataset:
     - "128qam cross"
     - "256qam"
 
+  ## Porcentaje del Dataset para testeo
+  test_pct: 0.15
+  
   ## División train / val  (ignorado si usas k_folds)
+  ##    Proporción *dentro* de train+val
   train_pct: 0.8
 
   ## Validación cruzada: pon número (k) o null

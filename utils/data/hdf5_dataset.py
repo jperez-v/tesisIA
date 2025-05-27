@@ -1,18 +1,20 @@
 """
 Carga un .hdf5 (local o descargado desde Kaggle) y genera:
   •  Atributos X, Y, Z en NumPy.
+  • Split independiente de *test* (stratificado)
+  • Validación con *StratifiedKFold* sobre el bloque train+val
   •  Índices de train/val por porcentaje o K‑Fold.
   •  Métodos helper para obtener (X_split, Y_split) o tf.data.Dataset.
 
-No depende de PyTorch.
 """
 
 from __future__ import annotations
 import os
 from pathlib import Path
+
 import h5py
 import numpy as np
-from sklearn.model_selection import KFold
+from sklearn.model_selection import train_test_split, StratifiedKFold
 
 try:
     # solo necesario si usas source='kaggle'
@@ -23,6 +25,9 @@ except ModuleNotFoundError:
     KaggleApi = None
 
 class HDF5Dataset:
+    """Carga en memoria un *.hdf5* con X/Y[/Z] y provee *splits* flexibles."""
+
+    # ──────────────────────────────────────────────────────────────────
     def __init__(
         self,
         *,
@@ -32,15 +37,19 @@ class HDF5Dataset:
         kaggle_dataset_id: str | None = None,
         local_download_dir: str | Path = "datasets/raw",
         # --- split
-        split: str = "train",          # "train" | "val"
-        train_pct: float = 0.8,
+        split: str = "train",  # "train" | "val" | "test"
+        test_pct: float = 0.15,  # proporción para test (0 → sin test)
+        train_pct: float = 0.8,  # proporción *dentro* de train+val
         k_folds: int | None = None,
         fold_index: int | None = None,
         seed: int = 42,
         # --- keys dentro del HDF5
         keys: dict | None = None,
-    ):
-        # ─────────────────── 0) Descargar de Kaggle (opcional) ───────────────────
+    ) -> None:
+        self.split = split.lower()
+        self.seed = seed
+    
+        # ╭─────────────────── 0) Descarga de Kaggle ───────────────────╮
         if kaggle_dataset_id:
             if KaggleApi is None:
                 raise ImportError("pip install kaggle  (librería faltante)")
@@ -65,12 +74,12 @@ class HDF5Dataset:
         if file_path is None or not Path(file_path).is_file():
             raise FileNotFoundError(f"HDF5 inexistente: {file_path}")
 
-        # ─────────────────── 1) Leer en memoria ───────────────────
+        # ╭─────────────────── 1) Lectura a NumPy ───────────────────────╮
         self.keys = keys or {"X": "X", "Y": "Y", "Z": "Z"}
         with h5py.File(file_path, "r") as f:
-            X = f[self.keys["X"]][:]
-            Y = f[self.keys["Y"]][:]
-            Z = f[self.keys["Z"]][:]
+            self.X = f[self.keys["X"]][:]
+            self.Y = f[self.keys["Y"]][:]
+            self.Z = f[self.keys["Z"]][:]
             
             # -------- Effects --------------------------------------------------
             if "Effects" in f:
@@ -83,115 +92,105 @@ class HDF5Dataset:
             else:
                 self.Effects = None           # << siempre creado
         
-        self.X = X
-        self.Y = Y
-        self.Z = Z
-        
-        # ─────────────────── 2) Índices de split ───────────────────
-        rng = np.random.RandomState(seed)
+
+        # ╭─────────────────── 2) Índices de split ──────────────────────╮
+        rng = np.random.RandomState(self.seed)
         indices = np.arange(len(self.X))
 
-        # Validar fold_index si se usa k_folds
+        # 2.1) Split TEST (fijo, estratificado) ─────────────────────────
+        if test_pct > 0:
+            trainval_idx, test_idx = train_test_split(
+                indices,
+                test_size=test_pct,
+                stratify=self.Y,
+                random_state=self.seed,
+            )
+            self.test_idx = np.array(test_idx, dtype=np.int64)
+        else:
+            trainval_idx = indices
+            self.test_idx = None
+
+        # 2.2) Dentro de trainval → CV o split porcentual ───────────────
         if k_folds is not None and k_folds > 1:
+            if fold_index is None:
+                raise ValueError("Debes indicar fold_index (0‑based) cuando k_folds>1")
             if not (0 <= fold_index < k_folds):
                 raise ValueError(f"fold_index={fold_index} fuera de rango para k_folds={k_folds}")
-            kf = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
-            splits = list(kf.split(indices))
-            train_idx, val_idx = splits[fold_index]
+
+            skf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=seed)
+            splits = list(skf.split(trainval_idx, self.Y[trainval_idx]))
+            train_rel, val_rel = splits[fold_index]
+            self.train_idx = trainval_idx[train_rel]
+            self.val_idx   = trainval_idx[val_rel]
         else:
-            rng.shuffle(indices)
-            cut = int(len(indices) * train_pct)
-            train_idx, val_idx = indices[:cut], indices[cut:]
+            rng.shuffle(trainval_idx)
+            cut = int(len(trainval_idx) * train_pct)
+            self.train_idx = trainval_idx[:cut]
+            self.val_idx   = trainval_idx[cut:]
 
-        self.train_idx, self.val_idx = train_idx, val_idx
-        self.split = split.lower()
 
-    # ─────────────────── helpers ───────────────────
-    def get_arrays(self, split: str | None = None):
-        """Devuelve (X_split, Y_split)"""
-        split = (split or self.split).lower()
-        idx   = self.train_idx if split == "train" else self.val_idx
+    # ───────────────────── helpers ─────────────────────
+    def _sel(self, idx: np.ndarray | None) -> tuple[np.ndarray, np.ndarray]:
+        if idx is None:
+            raise ValueError("Este split no está disponible (quizá test_pct=0?)")
         return self.X[idx], self.Y[idx]
 
-    def to_tf_dataset(
-            self,
-            split: str | None = None,
-            batch_size: int = 32,
-            shuffle: bool = True,
-            include_index: bool = False,
-            buffer_size: int | None = None,
-            prefetch: bool = True,
-        ):
-        """
-        Devuelve un tf.data.Dataset listo para Keras.
-    
-        Args
-        ----
-        split          : "train" | "val" | None (usa self.split por defecto)
-        batch_size     : tamaño de lote para .batch()
-        shuffle        : baraja el dataset (solo si True)
-        buffer_size    : tamaño del buffer para .shuffle()
-        prefetch       : aplica .prefetch(AUTOTUNE) si True
-        include_index  : • True  → añade el índice original como 3er tensor
-                         • False → devuelve solo (X, y)
-        """
-        import tensorflow as tf
-    
+    def get_arrays(self, split: str | None = None):
+        """Devuelve *(X_split, Y_split)* para «train», «val» o «test»."""
         split = (split or self.split).lower()
-        X_split, Y_split = self.get_arrays(split)
-        idx_split = (
-            self.train_idx if split == "train" else self.val_idx
-        )  # índices absolutos
-    
+        if split == "train":
+            return self._sel(self.train_idx)
+        if split == "val":
+            return self._sel(self.val_idx)
+        if split == "test":
+            return self._sel(self.test_idx)
+        raise ValueError("split debe ser 'train', 'val' o 'test'")
+        
+    # ------------------------------------------------------------------
+    def to_tf_dataset(
+        self,
+        *,
+        split: str | None = None,
+        batch_size: int = 32,
+        shuffle: bool = True,
+        include_index: bool = False,
+        buffer_size: int | None = None,
+        prefetch: bool = True,
+    ):
+        """Convierte cualquier split en un *tf.data.Dataset* listo para Keras."""
+        import tensorflow as tf
+
+        Xs, Ys = self.get_arrays(split)
+        idx = (
+            self.train_idx if split == "train" else
+            self.val_idx   if split == "val"   else
+            self.test_idx
+        )
 
         if include_index:
-            ds = tf.data.Dataset.from_tensor_slices((X_split, Y_split, idx_split))
+            ds = tf.data.Dataset.from_tensor_slices((Xs, Ys, idx))
         else:
-            ds = tf.data.Dataset.from_tensor_slices((X_split, Y_split))
-    
-        # Barajado, batching, prefetch
-        if shuffle:
-            ds = ds.shuffle(buffer_size or len(X_split), seed=123, reshuffle_each_iteration=True)
+            ds = tf.data.Dataset.from_tensor_slices((Xs, Ys))
+
+        if shuffle and split == "train":  # sólo barajamos entreno
+            ds = ds.shuffle(buffer_size or len(Xs), seed=self.seed, reshuffle_each_iteration=True)
         ds = ds.batch(batch_size)
         if prefetch:
             ds = ds.prefetch(tf.data.AUTOTUNE)
         return ds
 
     # ------------------------------------------------------------------ #
-    def get_effects(
-        self,
-        split: str | None = None,
-        fields: list[str] | None = None,
-    ):
-        """
-        Devuelve un *structured array* con los efectos (grupo `Effects`)
-        alineados al split solicitado.
-
-        Parameters
-        ----------
-        split   : {"train", "val", None}
-                  None → usa el split con el que se creó la instancia.
-        fields  : lista opcional de nombres de columna para filtrar,
-                  p.ej. ["snr_db", "num_taps"].  Si se omite devuelve
-                  todas las columnas.
-
-        Returns
-        -------
-        np.ndarray  (structured)
-            Efectos correspondientes al split, con los dtypes originales.
-
-        Raises
-        ------
-        ValueError
-            Si el HDF5 no contiene grupo 'Effects'.
-        """
+    def get_effects(self, split: str | None = None, *, fields: list[str] | None = None):
+        """Devuelve un *structured array* de efectos alineado al split."""
         if self.Effects is None:
-            raise ValueError("Este archivo HDF5 no contiene grupo 'Effects'.")
-
+            raise ValueError("El archivo HDF5 no contiene grupo 'Effects'.")
         split = (split or self.split).lower()
-        idx = self.train_idx if split == "train" else self.val_idx
-
-        eff = self.Effects[idx]          # vista alineada
+        idx = (
+            self.train_idx if split == "train" else
+            self.val_idx   if split == "val"   else
+            self.test_idx
+        )
+        eff = self.Effects[idx]  # vista alineada
         if fields is not None:
-            eff = eff[fields].copy()     # sub‑vista con columnas pedidas
+            eff = eff[fields].copy()
         return eff
