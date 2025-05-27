@@ -1,0 +1,54 @@
+# configs/default.yaml
+# Configuración global compartida por todos los experimentos
+
+# ---------------------------------------------------------
+# Sección de experimento
+# ---------------------------------------------------------
+experiment:
+  # Carpeta base bajo BASE_DIR/outputs donde se guardan logs/checkpoints
+  output_root: "outputs"
+  model_class:  "NN"
+
+# ---------------------------------------------------------
+# Sección de datos
+# ---------------------------------------------------------
+dataset:
+  # Ruta base relativa a BASE_DIR/datasets para archivos HDF5
+  base_path: "raw"
+  # Porcentaje por defecto para split entrenamiento/validación
+  train_pct: 0.8
+  # Número de folds por defecto (None = usar split por porcentaje)
+  k_folds: null
+  # Claves por defecto dentro del archivo HDF5
+  keys:
+    X: "X"
+    Y: "Y"
+    Z: "Z"
+
+# ---------------------------------------------------------
+# Sección de modelo
+# ---------------------------------------------------------
+model:
+  # Parámetros por defecto para inicializar la clase NN
+  params:
+    # Parámetros comunes (ninguno)
+
+# ---------------------------------------------------------
+# Sección de entrenamiento
+# ---------------------------------------------------------
+training:
+  # Hiperparámetros comunes a todos los experimentos
+  batch_size:     32
+  epochs:         20
+  learning_rate:  1e-3
+  weight_decay:   1e-5
+  seed:           42
+  device: "cpu"     # cpu o gpu
+
+# ---------------------------------------------------------
+# Sección de rutas
+# ---------------------------------------------------------
+paths:
+  # Directorios relativos a BASE_DIR donde guardar logs y checkpoints
+  logs_dir:         "logs"
+  checkpoints_dir:  "models/checkpoints"
