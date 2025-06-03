@@ -42,7 +42,11 @@ def load_config(exp_name:str):
         cfg = exp_cfg
     return cfg
 
-def load_experiment(exp_name: str, fold_index: int | None = None):
+def load_experiment(
+    exp_name: str,
+    repeat_index: int
+    fold_index: int | None = None,
+    ):
     """
     Devuelve:
         cfg          → dict  (configuración combinada)
@@ -85,16 +89,21 @@ def load_experiment(exp_name: str, fold_index: int | None = None):
     common_ds_kwargs = dict(
         test_pct   = ds_cfg["test_pct"],
         train_pct  = ds_cfg["train_pct"],
+        repeat_index = repeat_index if ds_cfg["repeat_index"] else None ,
         k_folds    = ds_cfg["k_folds"] or None,
         fold_index = fold_index if ds_cfg["k_folds"] else None ,
         seed       = cfg["training"]["seed"],
         keys       = ds_cfg["keys"],
     )
-
+    
+    # // Modificar subdirectorio de acuerdo a número actual de repetición  \\
+    cfg["experiment"]["output_subdir"] = cfg["experiment"]["output_subdir"] + "/" + f"rep_{repeat_index}"
+    
     # // Modificar subdirectorio si k-fold está configurado \\
     k = cfg["dataset"].get("k_folds")
     if k is not None and k > 1:
         cfg["experiment"]["output_subdir"] = cfg["experiment"]["output_subdir"] + "/" + f"foldindex_{fold_index}"
+
 
     if ds_cfg["source"] == "kaggle":
         full_ds = HDF5Dataset(

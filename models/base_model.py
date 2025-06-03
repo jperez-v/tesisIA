@@ -30,12 +30,10 @@ class BaseTFModel:
         # Construir y compilar el modelo
         self.model = self.build_model()
         print("✔️ Modelo Keras inicializado")
-        # self.model.summary()
 
         tr = self.cfg['training']
         optimizer = tf.keras.optimizers.Adam(
             learning_rate=float(tr['learning_rate'])
-            # decay es ignorado en TF2+, así lo omitimos
         )
         self.model.compile(
             optimizer=optimizer,

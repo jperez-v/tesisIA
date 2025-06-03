@@ -42,7 +42,8 @@ class HDF5Dataset:
         train_pct: float = 0.8,  # proporción *dentro* de train+val
         k_folds: int | None = None,
         fold_index: int | None = None,
-        repeat_index: int | None = None,
+        # --- repetitions
+        repeat_index: int,
         seed: int = 42,
         # --- keys dentro del HDF5
         keys: dict | None = None,
@@ -50,9 +51,8 @@ class HDF5Dataset:
         self.split = split.lower()
         
         # ╭─────────────────── SEED ───────────────────╮
-        self.seed = seed + repeat_index * 1000 + (fold_index or 0) if repeat_index is not None else seed
+        self.seed = seed + repeat_index * 1000 + (fold_index or 0)
             
-    
         # ╭─────────────────── 0) Descarga de Kaggle ───────────────────╮
         if kaggle_dataset_id:
             if KaggleApi is None:
@@ -73,20 +73,21 @@ class HDF5Dataset:
                     unzip=True,
                     quiet=False,
                 )
-                h5_files = sorted(local_download_dir.rglob("*.hdf5"))
-                if not h5_files:
-                    raise FileNotFoundError("No se encontró ningún .hdf5 en el zip")
-            else:
-                print(f"✅ Usando archivo HDF5 existente: {h5_files[0]}")
-            
+                
+            h5_files = sorted(local_download_dir.rglob("*.hdf5"))
+            if not h5_files:
+                raise FileNotFoundError("No se encontró ningún .hdf5 en el zip")
+                    
             if len(h5_files) > 1:
-                raise ValidationError("")
+                raise ValidationError("Existe más de un dataset en el directorio. No es posible diferenciar correctamente el dataset a emplear.")
 
             file_path = h5_files[0]
-            print(f"✅ Usando archivo HDF5: {file_path}")
+    
 
         if file_path is None or not Path(file_path).is_file():
             raise FileNotFoundError(f"HDF5 inexistente: {file_path}")
+        
+        print(f"✅ Usando archivo HDF5: {file_path}")
 
         # ╭─────────────────── 1) Lectura a NumPy ───────────────────────╮
         self.keys = keys or {"X": "X", "Y": "Y", "Z": "Z"}

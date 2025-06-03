@@ -29,6 +29,9 @@ experiment:
 
   ## Subcarpeta específica de este experimento
   output_subdir: "<subdir_name>"              # p.ej. "model1_b"
+  
+  # Número de repeticiones
+  repeats: 10
 
 
 # ---------------------------------------------------------------------
@@ -62,7 +65,7 @@ dataset:
     - "64qam"
     - "128qam cross"
     - "256qam"
-
+    
   ## Porcentaje del Dataset para testeo
   test_pct: 0.15
   
@@ -72,7 +75,6 @@ dataset:
 
   ## Validación cruzada: pon número (k) o null
   k_folds:   null
-  k_fold_repeats: 10
 
 
 # ---------------------------------------------------------------------
