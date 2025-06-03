@@ -26,6 +26,7 @@ class ExperimentAnalyzer:
         model: tf.keras.Model,
         test_data: tf.data.Dataset,
         cfg: dict,
+        repeat_index: int,
         history=None,
         effects: np.ndarray | None = None,
         show_plots: bool = False,
@@ -43,6 +44,7 @@ class ExperimentAnalyzer:
         self.model = model
         self.history = history.history if hasattr(history, "history") else history
         self.cfg = cfg
+        self.repeat_index = repeat_index
         self.class_names = self.cfg["dataset"].get("class_names")
         self.effects = effects
         self.show_plots = show_plots
@@ -189,7 +191,8 @@ class ExperimentAnalyzer:
         out = {
             "experiment": {
                 "name":      self.cfg["experiment"]["name"],
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "repeat_index": self.repeat_index,
             },
             "evaluation": {
                 "loss":     val_loss,
@@ -263,7 +266,8 @@ class ExperimentAnalyzer:
         report: dict = {
             "experiment": {
                 "name": self.cfg["experiment"]["name"],
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "repeat_index": self.repeat_index,
             },
             "effects": {}
         }
