@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 from scipy.stats import t
 
 
-class ExperimentKFoldAnalyzer:
+class ExperimentRepAnalyzer:
     """
-    Agrega y resume los resultados de un experimento K-Fold leyendo los JSON de cada fold.
+    Agrega y resume los resultados de un experimento K-Fold o sin este leyendo los JSON de cada fold.
     """
     def __init__(self, cfg: dict):
         """
@@ -25,15 +25,33 @@ class ExperimentKFoldAnalyzer:
             / exp_cfg.get('output_root')
             / exp_cfg.get('output_subdir')
         )
+        
+        # Discriminar entre estructura k-fold (rep_0/fold_1) y estructura rep (rep_0/)
+        k = self.cfg["dataset"].get("k_folds")
+        if k is not None and k > 1:
+            # Buscar subdirectorios de k-fold
+            self.report_paths = sorted(
+                [
+                    fold_dir / 'reports' / 'classification_report.json'
+                    for rep_dir in self.root_exp_dir.iterdir()
+                    if rep_dir.is_dir() and rep_dir.name.startswith("rep_")
+                    for fold_dir in rep_dir.iterdir()
+                    if fold_dir.is_dir() and fold_dir.name.startswith("fold_")
+                    and (fold_dir / 'reports' / 'classification_report.json').exists()
+                ]
+            )
+        else:
+            self.report_paths = sorted(
+                [
+                    rep_dir / "reports" / "classification_report.json"
+                    for rep_dir in self.root_exp_dir.iterdir()
+                    if rep_dir.is_dir()
+                    and rep_dir.name.startswith("rep_")
+                    and (rep_dir / "reports" / "classification_report.json").exists()
+                ]
+            )
+            
 
-        # Buscar subdirectorios de k-fold
-        self.report_paths = sorted(
-            [fold_dir / 'reports' / 'classification_report.json'
-             for fold_dir in self.root_exp_dir.iterdir()
-             if fold_dir.is_dir()
-             and fold_dir.name.startswith("foldindex_")
-             and (fold_dir / 'reports' / 'classification_report.json').exists()]
-        )
         self.k = len(self.report_paths)
         if self.k == 0:
             raise FileNotFoundError(f"No se encontraron reports en {self.root_exp_dir}")
