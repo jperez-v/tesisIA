@@ -42,32 +42,46 @@ class HDF5Dataset:
         train_pct: float = 0.8,  # proporción *dentro* de train+val
         k_folds: int | None = None,
         fold_index: int | None = None,
+        repeat_index: int | None = None,
         seed: int = 42,
         # --- keys dentro del HDF5
         keys: dict | None = None,
     ) -> None:
         self.split = split.lower()
-        self.seed = seed
+        
+        # ╭─────────────────── SEED ───────────────────╮
+        self.seed = seed + repeat_index * 1000 + (fold_index or 0) if repeat_index is not None else seed
+            
     
         # ╭─────────────────── 0) Descarga de Kaggle ───────────────────╮
         if kaggle_dataset_id:
             if KaggleApi is None:
                 raise ImportError("pip install kaggle  (librería faltante)")
-            api = KaggleApi(); api.authenticate()
-
+            
+            # Verificar si ya existe el archivo HDF5
             local_download_dir = Path(local_download_dir)
             local_download_dir.mkdir(parents=True, exist_ok=True)
-
-            print(f"⬇️  Descargando «{kaggle_dataset_id}» …")
-            api.dataset_download_files(
-                kaggle_dataset_id,
-                path=str(local_download_dir),
-                unzip=True,
-                quiet=False,
-            )
+            
             h5_files = sorted(local_download_dir.rglob("*.hdf5"))
-            if not h5_files:
-                raise FileNotFoundError("No se encontró ningún .hdf5 en el zip")
+            
+            if not h5_files:  # Solo descargar si no existe
+                print(f"⬇️  Descargando «{kaggle_dataset_id}» …")
+                api = KaggleApi(); api.authenticate()
+                api.dataset_download_files(
+                    kaggle_dataset_id,
+                    path=str(local_download_dir),
+                    unzip=True,
+                    quiet=False,
+                )
+                h5_files = sorted(local_download_dir.rglob("*.hdf5"))
+                if not h5_files:
+                    raise FileNotFoundError("No se encontró ningún .hdf5 en el zip")
+            else:
+                print(f"✅ Usando archivo HDF5 existente: {h5_files[0]}")
+            
+            if len(h5_files) > 1:
+                raise ValidationError("")
+
             file_path = h5_files[0]
             print(f"✅ Usando archivo HDF5: {file_path}")
 
