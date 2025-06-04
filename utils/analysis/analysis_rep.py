@@ -402,7 +402,7 @@ class ExperimentRepAnalyzer:
         self.plot_classification_bars(metric='f1', confidence=confidence)
 
         print("\n=== Distribución de Support por Clase ===")
-        self.plot_support_distribution()
+        self.plot_support_distribution(confidence=confidence)
 
     def report_summary(self, confidence: float = 0.95) -> None:
         """
