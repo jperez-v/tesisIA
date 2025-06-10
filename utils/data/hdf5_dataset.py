@@ -137,7 +137,7 @@ class HDF5Dataset:
             else:                                     # ya es vector 1‑D
                 y_strat = self.Y
 
-            skf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=seed)
+            skf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=self.seed)
             splits = list(skf.split(trainval_idx, y_strat[trainval_idx]))
             train_rel, val_rel = splits[fold_index]
             self.train_idx = trainval_idx[train_rel]

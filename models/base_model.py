@@ -4,6 +4,16 @@ from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStoppi
 from pathlib import Path
 from tensorflow.keras.losses import CategoricalCrossentropy
 
+class EpochLoggerCallback(tf.keras.callbacks.Callback):
+    def __init__(self, log_freq=5):
+        super().__init__()
+        self.log_freq = log_freq
+      
+    def on_epoch_end(self, epoch, logs=None):
+        if (epoch + 1) % self.log_freq == 0:
+            print(f"Epoch {epoch + 1}: " +
+                  " - ".join([f"{k}: {v:.4f}" for k, v in logs.items()]))
+
 class BaseTFModel:
     """
     Clase base para modelos Keras.
@@ -65,16 +75,20 @@ class BaseTFModel:
                 monitor='val_accuracy',
                 save_best_only=bool(tr.get('save_best_only', True)),
                 save_weights_only=False,
-                verbose=1
+                verbose=0
             ),
             
             # 4) Reduce learning rate on plateau
             ReduceLROnPlateau(
                 monitor='val_accuracy',
-                factor=0.5,
-                patience=3,
+                factor=0.4,
+                patience=4,
                 min_lr=5e-5,
-                verbose=1
+                verbose=0
+            ),
+            
+            EpochLoggerCallback(
+                log_freq=5
             ),
             
         ]
@@ -121,7 +135,8 @@ class BaseTFModel:
             epochs=epochs,
             batch_size=batch_size,
             callbacks=self.get_callbacks(),
-            initial_epoch=initial_epoch
+            initial_epoch=initial_epoch,
+            verbose=0
         )
         return history
 
@@ -129,3 +144,14 @@ class BaseTFModel:
         """Carga pesos guardados (.keras)."""
         self.model.load_weights(path)
         print(f"✔️ Pesos cargados desde {path}")
+
+    def cleanup_old_checkpoints(self):
+        """Elimina todos los checkpoints excepto el más reciente."""
+        ckpt_dir = self.out_dir / 'checkpoints'
+        ckpt_files = sorted(ckpt_dir.glob('epoch_*.keras'))
+          
+        if len(ckpt_files) > 1:
+            # Mantener solo el último, eliminar el resto
+            for old_ckpt in ckpt_files[:-1]:
+                old_ckpt.unlink()
+                print(f"🗑️ Eliminado checkpoint: {old_ckpt.name}")

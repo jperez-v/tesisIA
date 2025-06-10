@@ -64,7 +64,6 @@ dataset:
     - "32qam cross"
     - "64qam"
     - "128qam cross"
-    - "256qam"
     
   ## Porcentaje del Dataset para testeo
   test_pct: 0.15
@@ -83,7 +82,7 @@ dataset:
 model:
   params:
     seq_len:           4096          # nº muestras por señal
-    n_classes:         7             # ≡ len(class_names)
+    n_classes:         6             # ≡ len(class_names)
     inception_filters: 64
     res_filters:      [128, 256]
     pool_size:         4
@@ -96,10 +95,10 @@ model:
 # 4) ENTRENAMIENTO
 # ---------------------------------------------------------------------
 training:
-  batch_size:    80
-  epochs:        100                  # <— ajusta aquí
-  learning_rate: 1e-4
-  patience:      5                   # early‑stopping
+  batch_size:    64
+  epochs:        150                  # <— ajusta aquí
+  learning_rate: 1e-3
+  patience:      20                   # early‑stopping
   seed:          42
 
 
