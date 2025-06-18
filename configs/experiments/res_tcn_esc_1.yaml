@@ -1,0 +1,108 @@
+# =====================================================================
+#  CONFIGURACIÓN BASE  ─  Clona y personaliza para cada experimento
+# =====================================================================
+_base_: default.yaml
+
+# ---------------------------------------------------------------------
+# 1) EXPERIMENTO
+# ---------------------------------------------------------------------
+experiment:
+  ## Nombre único y corto (carpetas, TensorBoard, etc.)
+  name:        "res_tcn_se_esc_1"                   # p.ej. "exp_model1_b"
+
+  ## Descripción legible (se muestra en logs)
+  description: "RES TCN SE => ESCENARIO 1"
+
+  ## Módulo (.ipynb) dentro de structure/models/
+  model_module: "res_tcn_se"               # p.ej. "model1"
+
+  ## Clase dentro del módulo (debe heredar de tu BaseTFModel)
+  model_class:  "NN"                # Siempre debe ser "NN"
+
+  ## Directorio raíz donde guardar salidas (se crea en runtime)
+  output_root:  "outputs"
+
+  ## Subcarpeta específica de este experimento
+  output_subdir: "res_tcn_se_esc_1"              # p.ej. "model1_b"
+  
+  repeats: 2
+
+
+# ---------------------------------------------------------------------
+# 2) DATASET
+# ---------------------------------------------------------------------
+dataset:
+  source: "kaggle"                            # "local" | "kaggle"
+
+  ## Ruta relativa dentro de structure/datasets (solo si source=="local")
+  local_path: "-"                             # ej. "raw/mi_dataset.hdf5"
+
+  kaggle:                                     # solo si source=="kaggle"
+    dataset_id:  "carlosandres069/6mods-6clases-snr0-4-taps2-phase0-45"   # ej. "user/snr8-12-taps2-phase0"
+    download_dir: "datasets/kaggle/res_tcn_se_esc_1"           # carpeta local donde guardar
+    file_pattern: "*.hdf5"                    # glob para elegir el archivo
+
+  ## Mapping de llaves dentro del HDF5 (normalmente no se cambia)
+  keys:
+    X: "X"
+    Y: "Y"
+    Z: "Z"
+
+  ## Nombres de clases (orden == índices)
+  class_names:
+    - "bpsk"
+    - "qpsk"
+    - "16qam"
+    - "32qam cross"
+    - "64qam"
+    - "128qam cross"
+    
+  ## Porcentaje del Dataset para testeo
+  test_pct: 0.1
+
+  ## División train / val  (ignorado si usas k_folds)
+  train_pct: 0.8
+
+  ## Validación cruzada: pon número (k) o null
+  k_folds:   5
+
+# ---------------------------------------------------------------------
+# 3) MODELO  (hiperparámetros del NN)
+# ---------------------------------------------------------------------
+model:
+  params:
+    seq_len:            4096          # nº muestras por señal
+    n_classes:          6             # ≡ len(class_names)
+    inception_filters:  64
+    pool_size:          4
+    res_filters:        [128, 256]
+    dilation_rates:     [1, 2]
+    num_heads:          2
+    key_dim:            16
+    attn_dropout:       0.1
+    ffn_units:          256
+    dense_units:        256
+    dropout:            0.3
+
+
+# ---------------------------------------------------------------------
+# 4) ENTRENAMIENTO
+# ---------------------------------------------------------------------
+training:
+  batch_size: 32
+  epochs: 150
+  learning_rate: 1e-3
+  patience: 15
+  seed: 42
+
+
+# ---------------------------------------------------------------------
+# 5) RUTAS AUXILIARES
+# ---------------------------------------------------------------------
+paths:
+  logs_dir:        "logs"                 # TensorBoard y CSVLogger
+  checkpoints_dir: "models/checkpoints"   # pesos .keras
+
+# =====================================================================
+#    FIN DEL TEMPLATE   –  Duplica → edita → corre tu experimento
+# =====================================================================
