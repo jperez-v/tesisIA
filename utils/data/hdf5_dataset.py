@@ -38,7 +38,7 @@ class HDF5Dataset:
         local_download_dir: str | Path = "datasets/raw",
         # --- split
         split: str = "train",  # "train" | "val" | "test"
-        test_pct: float = 0.15,  # proporción para test (0 → sin test)
+        test_pct: float = 0.1,  # proporción para test (0 → sin test)
         train_pct: float = 0.8,  # proporción *dentro* de train+val
         k_folds: int | None = None,
         fold_index: int | None = None,
@@ -50,8 +50,8 @@ class HDF5Dataset:
     ) -> None:
         self.split = split.lower()
         
-        # ╭─────────────────── SEED ───────────────────╮
-        self.seed = seed + repeat_index * 1000 + (fold_index or 0)
+        # ╭────────────── SEED ──────────────╮
+        self.seed = seed + repeat_index * 1000 
             
         # ╭─────────────────── 0) Descarga de Kaggle ───────────────────╮
         if kaggle_dataset_id:

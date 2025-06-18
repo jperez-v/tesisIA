@@ -398,6 +398,9 @@ class ExperimentRepAnalyzer:
         print("=== Heatmap de Accuracy por Rep x Fold ===")
         self.plot_heatmap_metric(metric='accuracy')
 
+        print("=== Heatmap de Loss por Rep x Fold ===")
+        self.plot_heatmap_metric(metric='loss')
+
         print("\n=== Barras de F1-score por Clase con IC ===")
         self.plot_classification_bars(metric='f1', confidence=confidence)
 

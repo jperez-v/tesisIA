@@ -66,13 +66,14 @@ def load_experiment(
     ipynb_path   = MODELS_ROOT / f"{model_module}.ipynb"
     py_path      = MODELS_ROOT / f"{model_module}.py"
 
-    if ipynb_path.exists() and (
-        not py_path.exists() or ipynb_path.stat().st_mtime > py_path.stat().st_mtime
-    ):
-        subprocess.run(
-            [sys.executable, "-m", "nbconvert", "--to", "python", str(ipynb_path)],
-            check=True,
-        )
+    if not py_path.exists():
+        if ipynb_path.exists() and (
+            not py_path.exists() or ipynb_path.stat().st_mtime > py_path.stat().st_mtime
+        ):
+            subprocess.run(
+                [sys.executable, "-m", "nbconvert", "--to", "python", str(ipynb_path)],
+                check=True,
+            )
 
     # ─────────────────── 3) Import dinámico del modelo ────────────────────
     sys.path.append(str(MODELS_ROOT))

@@ -3,16 +3,19 @@ import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping, ReduceLROnPlateau
 from pathlib import Path
 from tensorflow.keras.losses import CategoricalCrossentropy
+import datetime
 
 class EpochLoggerCallback(tf.keras.callbacks.Callback):
-    def __init__(self, log_freq=5):
+    def __init__(self, log_freq=5, timestamp_format='%d-%m-%Y %H:%M:%S'):
         super().__init__()
         self.log_freq = log_freq
+        self.timestamp_format = timestamp_format
       
     def on_epoch_end(self, epoch, logs=None):
         if (epoch + 1) % self.log_freq == 0:
-            print(f"Epoch {epoch + 1}: " +
-                  " - ".join([f"{k}: {v:.4f}" for k, v in logs.items()]))
+            ts = datetime.datetime.now().strftime(self.timestamp_format)
+            metrics = " - ".join([f"{k}: {v:.6f}" for k, v in logs.items()])
+            print(f"[{ts}] Epoch {epoch + 1}: {metrics}")
 
 class BaseTFModel:
     """
@@ -39,7 +42,7 @@ class BaseTFModel:
 
         # Construir y compilar el modelo
         self.model = self.build_model()
-        print("✔️ Modelo Keras inicializado")
+        print(" "*5, "✔️ Modelo Keras inicializado")
 
         tr = self.cfg['training']
         optimizer = tf.keras.optimizers.Adam(
@@ -80,10 +83,12 @@ class BaseTFModel:
             
             # 4) Reduce learning rate on plateau
             ReduceLROnPlateau(
-                monitor='val_accuracy',
-                factor=0.4,
-                patience=4,
-                min_lr=5e-5,
+                monitor='val_loss',
+                factor=0.2,
+                patience=6,
+                cooldown=2,
+                min_delta=1e-4,
+                min_lr=2e-5,
                 verbose=0
             ),
             
@@ -143,7 +148,7 @@ class BaseTFModel:
     def load_weights(self, path: str):
         """Carga pesos guardados (.keras)."""
         self.model.load_weights(path)
-        print(f"✔️ Pesos cargados desde {path}")
+        print(" "*7, f"✔️ Pesos cargados desde {path}")
 
     def cleanup_old_checkpoints(self):
         """Elimina todos los checkpoints excepto el más reciente."""
@@ -154,4 +159,4 @@ class BaseTFModel:
             # Mantener solo el último, eliminar el resto
             for old_ckpt in ckpt_files[:-1]:
                 old_ckpt.unlink()
-                print(f"🗑️ Eliminado checkpoint: {old_ckpt.name}")
+                print(" "*10, f"🗑️ Eliminado checkpoint: {old_ckpt.name}")

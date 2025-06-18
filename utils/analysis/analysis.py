@@ -202,7 +202,7 @@ class ExperimentAnalyzer:
         }
         
         # 4.1) Incluir fold_index (si es kfold)
-        if self.fold_index:
+        if self.fold_index is not None:
             out["experiment"]["fold_index"] = int(self.fold_index)
     
         # 5) Guardar JSON
@@ -272,7 +272,7 @@ class ExperimentAnalyzer:
             "effects": {}
         }
         # Incluir fold_index (si es kfold)
-        if self.fold_index:
+        if self.fold_index is not None:
             report["experiment"]["fold_index"] = int(self.fold_index)
              
 
