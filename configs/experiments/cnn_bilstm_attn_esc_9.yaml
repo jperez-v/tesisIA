@@ -25,7 +25,7 @@ experiment:
   ## Subcarpeta específica de este experimento
   output_subdir: "cnn_bilstm_attn_esc_9"              # p.ej. "model1_b"
   
-  repeats: 2
+  repeats: 4
 
 
 # ---------------------------------------------------------------------

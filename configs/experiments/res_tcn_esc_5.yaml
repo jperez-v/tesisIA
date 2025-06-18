@@ -25,7 +25,7 @@ experiment:
   ## Subcarpeta específica de este experimento
   output_subdir: "res_tcn_se_esc_5"              # p.ej. "model1_b"
   
-  repeats: 2
+  repeats: 4
 
 
 # ---------------------------------------------------------------------
