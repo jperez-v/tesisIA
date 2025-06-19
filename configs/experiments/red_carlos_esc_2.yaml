@@ -93,7 +93,7 @@ model:
 # 4) ENTRENAMIENTO
 # ---------------------------------------------------------------------
 training:
-  batch_size:    64
+  batch_size:    32
   epochs:        150                  # <— ajusta aquí
   learning_rate: 1e-3
   patience:      10                   # early‑stopping
