@@ -1,0 +1,114 @@
+# =====================================================================
+#  CONFIGURACIÓN BASE  ─  Clona y personaliza para cada experimento
+# =====================================================================
+_base_: default.yaml
+
+# ---------------------------------------------------------------------
+# 1) EXPERIMENTO
+# ---------------------------------------------------------------------
+experiment:
+  ## Nombre único y corto (carpetas, TensorBoard, etc.)
+  name:        "ARQ_1__ESC_8"                   # p.ej. "exp_model1_b"
+
+  ## Descripción legible (se muestra en logs)
+  description: "ARQUITECTURA 1: CNN BILSTM ATTN => ESCENARIO 8"
+
+  ## Módulo (.ipynb) dentro de structure/models/
+  model_module: "cnn_bilstm_attn"               # p.ej. "model1"
+
+  ## Clase dentro del módulo (debe heredar de tu BaseTFModel)
+  model_class:  "NN"                # Siempre debe ser "NN"
+
+  ## Directorio raíz donde guardar salidas (se crea en runtime)
+  output_root:  "outputs/ARQ_1"
+
+  ## Subcarpeta específica de este experimento
+  output_subdir: "ESC_8"              # p.ej. "model1_b"
+  
+  repeats: 10
+
+
+# ---------------------------------------------------------------------
+# 2) DATASET
+# ---------------------------------------------------------------------
+dataset:
+  source: "kaggle"                            # "local" | "kaggle"
+
+  ## Ruta relativa dentro de structure/datasets (solo si source=="local")
+  local_path: "-"                             # ej. "raw/mi_dataset.hdf5"
+
+  kaggle:                                     # solo si source=="kaggle"
+    dataset_id:  "carlosandres069/6mods-6clases-esc-8"   # ej. "user/snr8-12-taps2-phase0"
+    download_dir: "datasets/kaggle/ESC_8"           # carpeta local donde guardar
+    file_pattern: "*.hdf5"                    # glob para elegir el archivo
+
+  ## Mapping de llaves dentro del HDF5 (normalmente no se cambia)
+  keys:
+    X: "X"
+    Y: "Y"
+    Z: "Z"
+
+  ## Nombres de clases (orden == índices)
+  class_names:
+    - "bpsk"
+    - "qpsk"
+    - "16qam"
+    - "32qam cross"
+    - "64qam"
+    - "128qam cross"
+    
+  ## Porcentaje del Dataset para testeo
+  test_pct: 0
+
+  ## División train / val  (ignorado si usas k_folds)
+  train_pct: 0.8
+
+  ## Validación cruzada: pon número (k) o null
+  k_folds:   null
+
+# ---------------------------------------------------------------------
+# 3) MODELO  (hiperparámetros del NN)
+# ---------------------------------------------------------------------
+model:
+  params:
+    seq_len:      4096 
+    n_classes:    6         
+
+    # CNN frontend
+    conv_filters:      [64, 128, 128]   # tres bloques Conv1D
+    conv_kernels:      [7, 5, 3]        # longitud de kernel por bloque
+    conv_strides:      [2, 1, 1]        # stride por bloque
+    pool_stride:       2                # MaxPooling1D al final del front-end
+
+    # Recurrente
+    bi_lstm_units:     256              # si quieres dos capas: [384, 256]
+
+    # Attention
+    atten_units:       128
+
+    # Clasificador
+    dense_units:       128              # capa densa posterior a atención
+    dropout:           0.35             # prob. de apagado antes de softmax
+    act_dense:         relu             # activación de la capa densa
+
+# ---------------------------------------------------------------------
+# 4) ENTRENAMIENTO
+# ---------------------------------------------------------------------
+training:
+  batch_size:    32
+  epochs:        150                  
+  learning_rate: 1e-3
+  patience:      10                  
+  seed:          4208
+
+
+# ---------------------------------------------------------------------
+# 5) RUTAS AUXILIARES
+# ---------------------------------------------------------------------
+paths:
+  logs_dir:        "logs"                 # TensorBoard y CSVLogger
+  checkpoints_dir: "models/checkpoints"   # pesos .keras
+
+# =====================================================================
+#    FIN DEL TEMPLATE   –  Duplica → edita → corre tu experimento
+# =====================================================================

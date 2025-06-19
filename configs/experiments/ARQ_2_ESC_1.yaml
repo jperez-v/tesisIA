@@ -1,0 +1,112 @@
+# =====================================================================
+#  CONFIGURACIÓN BASE  ─  Clona y personaliza para cada experimento
+# =====================================================================
+_base_: default.yaml
+
+#  ▸ Las líneas que empiezan con “##” son comentarios ‑ayuda/guía‑
+#  ▸ Cambia los valores marcados con ‹...›; el resto suele permanecer.
+#  ▸ Para usar herencia hereda de este archivo con:   _base_: conf_base.yaml
+# =====================================================================
+
+# ---------------------------------------------------------------------
+# 1) EXPERIMENTO
+# ---------------------------------------------------------------------
+experiment:
+  ## Nombre único y corto (carpetas, TensorBoard, etc.)
+  name:        "ARQ_2__ESC_"                   # p.ej. "exp_model1_b"
+
+  ## Descripción legible (se muestra en logs)
+  description: "ARQUITECTURA 2: RED CARLOS => ESCENARIO "
+
+  ## Módulo (.ipynb) dentro de structure/models/
+  model_module: "red_carlos"               # p.ej. "model1"
+
+  ## Clase dentro del módulo (debe heredar de tu BaseTFModel)
+  model_class:  "NN"                # Siempre debe ser "NN"
+
+  ## Directorio raíz donde guardar salidas (se crea en runtime)
+  output_root:  "outputs/ARQ_2"
+
+  ## Subcarpeta específica de este experimento
+  output_subdir: "ESC_"              # p.ej. "model1_b"
+  
+  repeats: 10
+
+
+# ---------------------------------------------------------------------
+# 2) DATASET
+# ---------------------------------------------------------------------
+dataset:
+  ## "local"  → se usa datasets/<local_path>
+  ## "kaggle" → se descarga y se cachea en kaggle/download_dir
+  source: "kaggle"                            # "local" | "kaggle"
+
+  ## Ruta relativa dentro de structure/datasets (solo si source=="local")
+  local_path: "-"                             # ej. "raw/mi_dataset.hdf5"
+
+  kaggle:                                     # solo si source=="kaggle"
+    dataset_id:  "carlosandres069/6mods-6clases-esc-"   # ej. "user/snr8-12-taps2-phase0"
+    download_dir: "datasets/kaggle/ESC_"           # carpeta local donde guardar
+    file_pattern: "*.hdf5"                    # glob para elegir el archivo
+
+  ## Mapping de llaves dentro del HDF5 (normalmente no se cambia)
+  keys:
+    X: "X"
+    Y: "Y"
+    Z: "Z"
+
+  ## Nombres de clases (orden == índices)
+  class_names:
+    - "bpsk"
+    - "qpsk"
+    - "16qam"
+    - "32qam cross"
+    - "64qam"
+    - "128qam cross"
+    
+  ## Porcentaje del Dataset para testeo
+  test_pct: 0
+
+  ## División train / val  (ignorado si usas k_folds)
+  train_pct: 0.8
+
+  ## Validación cruzada: pon número (k) o null
+  k_folds:   null
+
+# ---------------------------------------------------------------------
+# 3) MODELO  (hiperparámetros del NN)
+# ---------------------------------------------------------------------
+model:
+  params:
+    seq_len:            4096          # nº muestras por señal
+    n_classes:          6             # ≡ len(class_names)
+    filters:            32
+    num_heads:          2
+    key_dim:            16
+    regularizer:        2e-4
+    dense:              14
+    dropout:            0.3
+    pooling:            2
+
+
+# ---------------------------------------------------------------------
+# 4) ENTRENAMIENTO
+# ---------------------------------------------------------------------
+training:
+  batch_size:    64
+  epochs:        150                  # <— ajusta aquí
+  learning_rate: 1e-3
+  patience:      10                   # early‑stopping
+  seed:          420
+
+
+# ---------------------------------------------------------------------
+# 5) RUTAS AUXILIARES
+# ---------------------------------------------------------------------
+paths:
+  logs_dir:        "logs"                 # TensorBoard y CSVLogger
+  checkpoints_dir: "models/checkpoints"   # pesos .keras
+
+# =====================================================================
+#    FIN DEL TEMPLATE   –  Duplica → edita → corre tu experimento
+# =====================================================================
