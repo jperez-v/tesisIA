@@ -28,7 +28,7 @@ experiment:
   output_root:  "outputs"
 
   ## Subcarpeta específica de este experimento
-  output_subdir: "ESC_10"              # p.ej. "model1_b"
+  output_subdir: "red_carlos_esc_10"              # p.ej. "model1_b"
   
   repeats: 4
 
